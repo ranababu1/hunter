@@ -6,8 +6,11 @@ import {
   DragOverlay,
   PointerSensor,
   closestCorners,
+  pointerWithin,
+  rectIntersection,
   useSensor,
   useSensors,
+  type CollisionDetection,
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
@@ -75,7 +78,10 @@ function Column({
   statusMap: Record<string, KanbanStatus>;
   onOpen: (job: Job) => void;
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id });
+  const { setNodeRef, isOver } = useDroppable({
+    id,
+    data: { type: "column", status: id },
+  });
 
   return (
     <div
@@ -96,7 +102,7 @@ function Column({
       </div>
       <div
         ref={setNodeRef}
-        className="flex min-h-[120px] flex-1 flex-col gap-2 overflow-y-auto px-2 pb-3"
+        className="flex min-h-[280px] flex-1 flex-col gap-2 overflow-y-auto px-2 pb-3"
       >
         <SortableContext
           items={jobs.map((j) => j.id)}
@@ -112,6 +118,11 @@ function Column({
             />
           ))}
         </SortableContext>
+        {jobs.length === 0 ? (
+          <div className="flex flex-1 items-center justify-center rounded-xl border border-dashed border-[var(--border)] px-3 py-8 text-center text-[10px] uppercase tracking-wider text-[var(--text-dim)]">
+            Drop here
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -194,8 +205,29 @@ export function KanbanBoard({
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
   );
 
+  const columnIds = useMemo(
+    () => KANBAN_COLUMNS.map((c) => c.id) as KanbanStatus[],
+    [],
+  );
+
+  /** Prefer column hit-targets (incl. empty) over tall card stacks. */
+  const collisionDetection: CollisionDetection = useCallback((args) => {
+    const pointerHits = pointerWithin(args);
+    const columnHit = pointerHits.find((c) =>
+      columnIds.includes(c.id as KanbanStatus),
+    );
+    if (columnHit) return [columnHit];
+    if (pointerHits.length > 0) return pointerHits;
+    const intersections = rectIntersection(args);
+    const columnIntersect = intersections.find((c) =>
+      columnIds.includes(c.id as KanbanStatus),
+    );
+    if (columnIntersect) return [columnIntersect];
+    return closestCorners(args);
+  }, [columnIds]);
+
   function findContainer(id: string): KanbanStatus | undefined {
-    if ((KANBAN_COLUMNS.map((c) => c.id) as string[]).includes(id)) {
+    if (columnIds.includes(id as KanbanStatus)) {
       return id as KanbanStatus;
     }
     return state.status[id] ?? "not_applied";
@@ -211,10 +243,9 @@ export function KanbanBoard({
     if (!over) return;
     const jobId = String(active.id);
     const overId = String(over.id);
-    const dest =
-      (KANBAN_COLUMNS.map((c) => c.id) as string[]).includes(overId)
-        ? (overId as KanbanStatus)
-        : findContainer(overId);
+    const dest = columnIds.includes(overId as KanbanStatus)
+      ? (overId as KanbanStatus)
+      : findContainer(overId);
     if (!dest) return;
     const current = state.status[jobId] ?? "not_applied";
     if (current === dest) return;
@@ -236,7 +267,7 @@ export function KanbanBoard({
 
       <DndContext
         sensors={sensors}
-        collisionDetection={closestCorners}
+        collisionDetection={collisionDetection}
         onDragStart={onDragStart}
         onDragEnd={onDragEnd}
       >
