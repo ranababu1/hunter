@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
 import clsx from "clsx";
 import {
   Crosshair,
@@ -16,6 +15,7 @@ import {
   CreditCard,
   Users,
 } from "lucide-react";
+import { useMe } from "@/components/MeProvider";
 
 const baseLinks = [
   { href: "/", label: "Daily", icon: Newspaper },
@@ -25,35 +25,12 @@ const baseLinks = [
   { href: "/companies", label: "Companies", icon: Building2 },
 ];
 
-type MeUser = { email: string; name: string; role: string };
-type MeEntitlements = { isAdmin?: boolean };
-
 export function Nav() {
   const pathname = usePathname();
   const router = useRouter();
-  const [user, setUser] = useState<MeUser | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/me");
-        if (!res.ok) return;
-        const data = (await res.json()) as {
-          user?: MeUser;
-          entitlements?: MeEntitlements;
-        };
-        if (!cancelled && data.user) setUser(data.user);
-        if (!cancelled) setIsAdmin(Boolean(data.entitlements?.isAdmin));
-      } catch {
-        // ignore
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const { me } = useMe();
+  const user = me?.user ?? null;
+  const isAdmin = Boolean(me?.entitlements?.isAdmin);
 
   const links = isAdmin
     ? [

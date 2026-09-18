@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronDown, ExternalLink, Play, RefreshCw } from "lucide-react";
 import clsx from "clsx";
 import type { CompanyFetch, FetchRun } from "@/lib/types";
+import { useMe } from "@/components/MeProvider";
 
 function portalLabel(url: string): string {
   try {
@@ -113,6 +114,7 @@ type FetchesApi = {
 };
 
 export function FetchesView() {
+  const { refreshMe } = useMe();
   const [data, setData] = useState<FetchesApi | null>(null);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
@@ -169,6 +171,7 @@ export function FetchesView() {
       }
       if (json.run) setSelectedId(json.run.id);
       await refresh();
+      await refreshMe();
     } catch {
       setError("Network error");
     } finally {

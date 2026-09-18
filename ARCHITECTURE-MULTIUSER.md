@@ -139,6 +139,34 @@ Extended entitlements (Phase 2):
 | `UPSTASH_REDIS_REST_URL` | Yes (multi-user) | |
 | `UPSTASH_REDIS_REST_TOKEN` | Yes (multi-user) | |
 
+
+## Caching model (process-local)
+
+In-memory cache in `lib/cache.ts` (Map + short TTL + simple LRU cap of 500 entries). **Not** a Redis second layer — Redis remains the source of truth for mutable user data.
+
+### Integrity guarantees
+
+1. **Redis-first writes:** every mutation writes Redis (or fails) *before* `cacheSet` / `invalidateUser`.
+2. **No writer-stale:** after a successful user mutation, `invalidateUser(userId)` drops all `u:{userId}:*` keys (including assembled `me`). Writers never leave their own stale entries.
+3. **No cross-user bleed:** user keys are always `u:{userId}:{part}` via `userCacheKey`.
+4. **TTL safety net** (multi-instance Vercel): even with invalidation, entries expire so other instances cannot serve stale data forever.
+
+### TTLs
+
+| Data | Key pattern | TTL |
+|---|---|---|
+| User / billing / usage / profile / companies / appState / fetchRuns / lastFetchDate | `u:{userId}:*` | **20s** |
+| Assembled `GET /api/me` payload | `u:{userId}:me` | **8s** |
+| Static files (`jobs.json`, digests, `fetches.json`, daily dates) | `static:jobs:*` | **90s** |
+
+### Client sharing
+
+`MeProvider` (`components/MeProvider.tsx`) wraps `(app)/layout.tsx` and fetches `/api/me` **once**. Nav, Companies, Profile, Billing, Fetches consume context; mutations that change usage/entitlements call `refreshMe()`.
+
+### HTTP
+
+GET `/api/me`, `/api/companies`, `/api/fetches` set `Cache-Control: private, max-age=0, stale-while-revalidate=15` so the browser can briefly reuse while mutations still invalidate the server cache.
+
 ## Later
 
 - Live career-portal crawler / morning agent writing FetchRun

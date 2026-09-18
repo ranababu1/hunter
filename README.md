@@ -93,3 +93,8 @@ npm run lint
 ## License
 
 Private — for personal use.
+
+## Caching
+
+Process-local in-memory cache (`lib/cache.ts`) cuts Redis/file round-trips. Mutations always write Redis first, then invalidate `u:{userId}:*`. See **Caching model** in `ARCHITECTURE-MULTIUSER.md`.
+

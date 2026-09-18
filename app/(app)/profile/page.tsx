@@ -4,13 +4,10 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import { Plus, X, Upload } from "lucide-react";
 import type { TargetRole, UserProfile } from "@/lib/types";
 import { QuotaBanner } from "@/components/QuotaBanner";
-
-type MePayload = {
-  usage: { bytesUsed: number };
-  entitlements: { maxStorageBytes: number; maxCompanies: number };
-};
+import { useMe } from "@/components/MeProvider";
 
 export default function ProfilePage() {
+  const { me, refreshMe } = useMe();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [displayName, setDisplayName] = useState("");
   const [phone, setPhone] = useState("");
@@ -21,14 +18,10 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [me, setMe] = useState<MePayload | null>(null);
 
   const refresh = useCallback(async () => {
     try {
-      const [pRes, mRes] = await Promise.all([
-        fetch("/api/profile"),
-        fetch("/api/me"),
-      ]);
+      const pRes = await fetch("/api/profile");
       if (pRes.ok) {
         const data = (await pRes.json()) as {
           profile: UserProfile;
@@ -39,9 +32,6 @@ export default function ProfilePage() {
         setPhone(data.profile.phone || data.user?.phone || "");
         setResumeText(data.profile.resumeText ?? "");
         setRoles(data.profile.targetRoles ?? []);
-      }
-      if (mRes.ok) {
-        setMe((await mRes.json()) as MePayload);
       }
       setError(null);
     } catch {
@@ -132,8 +122,7 @@ export default function ProfilePage() {
         setProfile(data.profile);
       }
       setMessage("Profile saved");
-      const mRes = await fetch("/api/me");
-      if (mRes.ok) setMe((await mRes.json()) as MePayload);
+      await refreshMe();
     } catch {
       setError("Network error");
     } finally {

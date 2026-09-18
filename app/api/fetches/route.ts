@@ -8,5 +8,9 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const payload = await getFetchesPayload(user);
-  return NextResponse.json(payload);
+  return NextResponse.json(payload, {
+    headers: {
+      "Cache-Control": "private, max-age=0, stale-while-revalidate=15",
+    },
+  });
 }

@@ -3,6 +3,13 @@ import { hashPassword } from "./password";
 import { GLOBAL, u, userKey } from "./keys";
 import { adminBilling, DEFAULT_BILLING } from "./plans";
 import { newUserId } from "./auth-id";
+import {
+  CACHE_TTL,
+  cacheGet,
+  cacheSet,
+  invalidateUser,
+  userCacheKey,
+} from "./cache";
 import type {
   AppState,
   BillingAccount,
@@ -22,12 +29,21 @@ export function getRedis(): Redis | null {
 }
 
 export async function getUserById(id: string): Promise<User | null> {
+  const ck = userCacheKey(id, "user");
+  const hit = cacheGet<User | null>(ck);
+  if (hit !== undefined) return hit;
+
   const redis = getRedis();
   if (!redis) return null;
   try {
     const raw = await redis.get<string | User>(userKey(id));
-    if (raw == null) return null;
-    return typeof raw === "string" ? (JSON.parse(raw) as User) : raw;
+    if (raw == null) {
+      cacheSet(ck, null, CACHE_TTL.USER);
+      return null;
+    }
+    const user = typeof raw === "string" ? (JSON.parse(raw) as User) : raw;
+    cacheSet(ck, user, CACHE_TTL.USER);
+    return user;
   } catch (err) {
     console.warn("[hunter] getUserById failed:", err);
     return null;
@@ -47,7 +63,7 @@ export async function findUserByEmail(email: string): Promise<User | null> {
   }
 }
 
-/** Create or upsert user record + email index. */
+/** Create or upsert user record + email index. Redis write before cache invalidate. */
 export async function createUser(user: User): Promise<boolean> {
   const redis = getRedis();
   if (!redis) return false;
@@ -75,6 +91,7 @@ export async function createUser(user: User): Promise<boolean> {
         } satisfies UsageMeter),
       );
     }
+    invalidateUser(user.id);
     return true;
   } catch (err) {
     console.warn("[hunter] createUser failed:", err);
@@ -114,14 +131,22 @@ export async function ensureAdminBootstrap(): Promise<void> {
 }
 
 export async function getBilling(userId: string): Promise<BillingAccount | null> {
+  const ck = userCacheKey(userId, "billing");
+  const hit = cacheGet<BillingAccount | null>(ck);
+  if (hit !== undefined) return hit;
+
   const redis = getRedis();
   if (!redis) return null;
   try {
     const raw = await redis.get<string | BillingAccount>(u(userId).billing);
-    if (raw == null) return null;
-    return typeof raw === "string"
-      ? (JSON.parse(raw) as BillingAccount)
-      : raw;
+    if (raw == null) {
+      cacheSet(ck, null, CACHE_TTL.USER);
+      return null;
+    }
+    const billing =
+      typeof raw === "string" ? (JSON.parse(raw) as BillingAccount) : raw;
+    cacheSet(ck, billing, CACHE_TTL.USER);
+    return billing;
   } catch {
     return null;
   }
@@ -135,6 +160,7 @@ export async function setBilling(
   if (!redis) return false;
   try {
     await redis.set(u(userId).billing, JSON.stringify(billing));
+    invalidateUser(userId);
     return true;
   } catch {
     return false;
@@ -142,12 +168,22 @@ export async function setBilling(
 }
 
 export async function getUsage(userId: string): Promise<UsageMeter | null> {
+  const ck = userCacheKey(userId, "usage");
+  const hit = cacheGet<UsageMeter | null>(ck);
+  if (hit !== undefined) return hit;
+
   const redis = getRedis();
   if (!redis) return null;
   try {
     const raw = await redis.get<string | UsageMeter>(u(userId).usage);
-    if (raw == null) return null;
-    return typeof raw === "string" ? (JSON.parse(raw) as UsageMeter) : raw;
+    if (raw == null) {
+      cacheSet(ck, null, CACHE_TTL.USER);
+      return null;
+    }
+    const usage =
+      typeof raw === "string" ? (JSON.parse(raw) as UsageMeter) : raw;
+    cacheSet(ck, usage, CACHE_TTL.USER);
+    return usage;
   } catch {
     return null;
   }
@@ -161,6 +197,7 @@ export async function setUsage(
   if (!redis) return;
   try {
     await redis.set(u(userId).usage, JSON.stringify(usage));
+    invalidateUser(userId);
   } catch (err) {
     console.warn("[hunter] setUsage failed:", err);
   }
@@ -174,12 +211,22 @@ export async function getProfile(userId: string): Promise<UserProfile> {
     targetRoles: [],
     updatedAt: new Date().toISOString(),
   };
+  const ck = userCacheKey(userId, "profile");
+  const hit = cacheGet<UserProfile>(ck);
+  if (hit !== undefined) return hit;
+
   const redis = getRedis();
   if (!redis) return empty;
   try {
     const raw = await redis.get<string | UserProfile>(u(userId).profile);
-    if (raw == null) return empty;
-    return typeof raw === "string" ? (JSON.parse(raw) as UserProfile) : raw;
+    if (raw == null) {
+      cacheSet(ck, empty, CACHE_TTL.USER);
+      return empty;
+    }
+    const profile =
+      typeof raw === "string" ? (JSON.parse(raw) as UserProfile) : raw;
+    cacheSet(ck, profile, CACHE_TTL.USER);
+    return profile;
   } catch {
     return empty;
   }
@@ -193,6 +240,7 @@ export async function saveProfile(
   if (!redis) return false;
   try {
     await redis.set(u(userId).profile, JSON.stringify(profile));
+    invalidateUser(userId);
     return true;
   } catch {
     return false;
@@ -237,6 +285,7 @@ export async function maybeMigrateGlobalData(adminUserId: string): Promise<void>
     }
 
     await redis.set(GLOBAL.migrated, new Date().toISOString());
+    invalidateUser(adminUserId);
     console.info("[hunter] Migrated global data → user", adminUserId);
   } catch (err) {
     console.warn("[hunter] maybeMigrateGlobalData failed:", err);
@@ -244,6 +293,10 @@ export async function maybeMigrateGlobalData(adminUserId: string): Promise<void>
 }
 
 export async function getUserAppState(userId: string): Promise<AppState> {
+  const ck = userCacheKey(userId, "appState");
+  const hit = cacheGet<AppState>(ck);
+  if (hit !== undefined) return hit;
+
   const redis = getRedis();
   if (!redis) return { visited: [], status: {} };
   const keys = u(userId);
@@ -252,10 +305,12 @@ export async function getUserAppState(userId: string): Promise<AppState> {
       redis.smembers(keys.visited),
       redis.hgetall<Record<string, KanbanStatus>>(keys.status),
     ]);
-    return {
+    const state: AppState = {
       visited: (visited as string[]) ?? [],
       status: status ?? {},
     };
+    cacheSet(ck, state, CACHE_TTL.USER);
+    return state;
   } catch (err) {
     console.warn("[hunter] getUserAppState failed:", err);
     return { visited: [], status: {} };
@@ -270,6 +325,7 @@ export async function markUserVisited(
   if (!redis) return;
   try {
     await redis.sadd(u(userId).visited, jobId);
+    invalidateUser(userId);
   } catch (err) {
     console.warn("[hunter] markUserVisited failed:", err);
   }
@@ -284,6 +340,7 @@ export async function setUserJobStatus(
   if (!redis) return;
   try {
     await redis.hset(u(userId).status, { [jobId]: status });
+    invalidateUser(userId);
   } catch (err) {
     console.warn("[hunter] setUserJobStatus failed:", err);
   }
@@ -358,13 +415,22 @@ export async function updateUserFields(
 }
 
 export async function getFetchRuns(userId: string): Promise<FetchRun[]> {
+  const ck = userCacheKey(userId, "fetchRuns");
+  const hit = cacheGet<FetchRun[]>(ck);
+  if (hit !== undefined) return hit;
+
   const redis = getRedis();
   if (!redis) return [];
   try {
     const raw = await redis.get<string | FetchRun[]>(u(userId).fetchRuns);
-    if (raw == null) return [];
+    if (raw == null) {
+      cacheSet(ck, [], CACHE_TTL.USER);
+      return [];
+    }
     const runs = typeof raw === "string" ? (JSON.parse(raw) as FetchRun[]) : raw;
-    return Array.isArray(runs) ? runs : [];
+    const list = Array.isArray(runs) ? runs : [];
+    cacheSet(ck, list, CACHE_TTL.USER);
+    return list;
   } catch {
     return [];
   }
@@ -378,6 +444,7 @@ export async function saveFetchRuns(
   if (!redis) return false;
   try {
     await redis.set(u(userId).fetchRuns, JSON.stringify(runs));
+    invalidateUser(userId);
     return true;
   } catch {
     return false;
@@ -385,12 +452,21 @@ export async function saveFetchRuns(
 }
 
 export async function getLastFetchDate(userId: string): Promise<string | null> {
+  const ck = userCacheKey(userId, "lastFetchDate");
+  const hit = cacheGet<string | null>(ck);
+  if (hit !== undefined) return hit;
+
   const redis = getRedis();
   if (!redis) return null;
   try {
     const raw = await redis.get<string>(u(userId).lastFetchDate);
-    if (raw == null) return null;
-    return typeof raw === "string" ? raw : String(raw);
+    if (raw == null) {
+      cacheSet(ck, null, CACHE_TTL.USER);
+      return null;
+    }
+    const date = typeof raw === "string" ? raw : String(raw);
+    cacheSet(ck, date, CACHE_TTL.USER);
+    return date;
   } catch {
     return null;
   }
@@ -404,6 +480,7 @@ export async function setLastFetchDate(
   if (!redis) return;
   try {
     await redis.set(u(userId).lastFetchDate, date);
+    invalidateUser(userId);
   } catch (err) {
     console.warn("[hunter] setLastFetchDate failed:", err);
   }

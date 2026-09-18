@@ -17,6 +17,7 @@ import type { CompanyPriority, CompanyProfile } from "@/lib/types";
 import { COMPANY_PRIORITIES } from "@/lib/types";
 import Link from "next/link";
 import { QuotaBanner } from "@/components/QuotaBanner";
+import { useMe } from "@/components/MeProvider";
 
 type SortKey = "name" | "priority";
 
@@ -89,6 +90,7 @@ function PriorityBadge({ priority }: { priority: CompanyPriority }) {
 }
 
 export function CompaniesView() {
+  const { me, refreshMe } = useMe();
   const [companies, setCompanies] = useState<CompanyProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -117,10 +119,7 @@ export function CompaniesView() {
 
   const refresh = useCallback(async () => {
     try {
-      const [res, meRes] = await Promise.all([
-        fetch("/api/companies"),
-        fetch("/api/me"),
-      ]);
+      const res = await fetch("/api/companies");
       if (!res.ok) throw new Error("Failed to load companies");
       const data = (await res.json()) as {
         companies: CompanyProfile[];
@@ -133,20 +132,6 @@ export function CompaniesView() {
         const m = data.entitlements.maxCompanies;
         setMaxCompanies(m < 0 ? Number.POSITIVE_INFINITY : m);
       }
-      if (meRes.ok) {
-        const me = (await meRes.json()) as {
-          usage?: { bytesUsed?: number };
-          entitlements?: { maxStorageBytes?: number; maxCompanies?: number };
-        };
-        if (me.usage?.bytesUsed != null) setBytesUsed(me.usage.bytesUsed);
-        if (me.entitlements?.maxStorageBytes != null) {
-          setMaxStorageBytes(me.entitlements.maxStorageBytes);
-        }
-        if (me.entitlements?.maxCompanies != null) {
-          const m = me.entitlements.maxCompanies;
-          setMaxCompanies(m < 0 ? Number.POSITIVE_INFINITY : m);
-        }
-      }
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Load failed");
@@ -158,6 +143,19 @@ export function CompaniesView() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // Sync entitlements / usage from shared MeProvider (single /api/me fetch)
+  useEffect(() => {
+    if (!me) return;
+    if (me.usage?.bytesUsed != null) setBytesUsed(me.usage.bytesUsed);
+    if (me.entitlements?.maxStorageBytes != null) {
+      setMaxStorageBytes(me.entitlements.maxStorageBytes);
+    }
+    if (me.entitlements?.maxCompanies != null) {
+      const m = me.entitlements.maxCompanies;
+      setMaxCompanies(m < 0 ? Number.POSITIVE_INFINITY : m);
+    }
+  }, [me]);
 
   useEffect(() => {
     if (!modal && !deleteTarget) return;
@@ -265,6 +263,7 @@ export function CompaniesView() {
         setImportError(data.message ?? data.error ?? "Import failed");
         return;
       }
+      await refreshMe();
     } catch {
       setImportError("Network error — could not import companies.");
     } finally {
@@ -348,6 +347,7 @@ export function CompaniesView() {
       }
       if (data.companies) setCompanies(data.companies);
       else await refresh();
+      await refreshMe();
       setModal(null);
     } catch {
       setCompanies(prev);
@@ -377,6 +377,7 @@ export function CompaniesView() {
         return;
       }
       if (data.companies) setCompanies(data.companies);
+      await refreshMe();
       setDeleteTarget(null);
     } catch {
       setCompanies(prev);

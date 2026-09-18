@@ -20,9 +20,22 @@ import {
 } from "./users";
 import { resolveEntitlements } from "./plans";
 import type { User } from "./types";
+import {
+  CACHE_TTL,
+  cacheGet,
+  cacheSet,
+  invalidateUser,
+  userCacheKey,
+} from "./cache";
 
 export { getRedis };
 export const COMPANIES_KEY = "hunter:companies"; // legacy global (migration source)
+
+type CompaniesResult = {
+  companies: CompanyProfile[];
+  fromSeed: boolean;
+  redisAvailable: boolean;
+};
 
 function utf8Bytes(s: string): number {
   return new TextEncoder().encode(s).length;
@@ -129,15 +142,22 @@ export async function loadSeedCompanies(): Promise<CompanyProfile[]> {
   return parsed;
 }
 
-export async function getCompanies(userId: string): Promise<{
-  companies: CompanyProfile[];
-  fromSeed: boolean;
-  redisAvailable: boolean;
-}> {
+export async function getCompanies(userId: string): Promise<CompaniesResult> {
+  const ck = userCacheKey(userId, "companies");
+  const hit = cacheGet<CompaniesResult>(ck);
+  if (hit !== undefined) return hit;
+
   const redis = getRedis();
   if (!redis) {
     const companies = await loadSeedCompanies();
-    return { companies, fromSeed: true, redisAvailable: false };
+    const result: CompaniesResult = {
+      companies,
+      fromSeed: true,
+      redisAvailable: false,
+    };
+    // Seed is static — short user TTL still fine as safety net
+    cacheSet(ck, result, CACHE_TTL.USER);
+    return result;
   }
   const key = u(userId).companies;
   try {
@@ -146,15 +166,34 @@ export async function getCompanies(userId: string): Promise<{
       // New user: start empty (not shared seed) — admin migration copies globals
       const companies: CompanyProfile[] = [];
       await redis.set(key, JSON.stringify(companies));
-      return { companies, fromSeed: false, redisAvailable: true };
+      const result: CompaniesResult = {
+        companies,
+        fromSeed: false,
+        redisAvailable: true,
+      };
+      // Redis write succeeded — write-through
+      cacheSet(ck, result, CACHE_TTL.USER);
+      return result;
     }
     const companies =
       typeof raw === "string" ? (JSON.parse(raw) as CompanyProfile[]) : raw;
     if (!Array.isArray(companies)) {
       await redis.set(key, JSON.stringify([]));
-      return { companies: [], fromSeed: false, redisAvailable: true };
+      const result: CompaniesResult = {
+        companies: [],
+        fromSeed: false,
+        redisAvailable: true,
+      };
+      cacheSet(ck, result, CACHE_TTL.USER);
+      return result;
     }
-    return { companies, fromSeed: false, redisAvailable: true };
+    const result: CompaniesResult = {
+      companies,
+      fromSeed: false,
+      redisAvailable: true,
+    };
+    cacheSet(ck, result, CACHE_TTL.USER);
+    return result;
   } catch (err) {
     console.warn("[hunter] getCompanies failed:", err);
     return { companies: [], fromSeed: false, redisAvailable: false };
@@ -170,6 +209,8 @@ export async function saveCompanies(
   try {
     await redis.set(u(userId).companies, JSON.stringify(companies));
     await recomputeAndStoreUsage(userId);
+    // setUsage already invalidateUser; ensure companies/me gone even if usage no-op
+    invalidateUser(userId);
     return true;
   } catch (err) {
     console.warn("[hunter] saveCompanies failed:", err);

@@ -77,13 +77,20 @@ export async function GET() {
   const entitlements = entitlementsForJson(
     resolveEntitlements(user.role, billing),
   );
-  return NextResponse.json({
-    companies,
-    fromSeed,
-    redisAvailable,
-    entitlements,
-    companyCount: companies.length,
-  });
+  return NextResponse.json(
+    {
+      companies,
+      fromSeed,
+      redisAvailable,
+      entitlements,
+      companyCount: companies.length,
+    },
+    {
+      headers: {
+        "Cache-Control": "private, max-age=0, stale-while-revalidate=15",
+      },
+    },
+  );
 }
 
 export async function POST(request: Request) {

@@ -2,24 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { formatBytes, PLAN_CATALOG } from "@/lib/plans";
-import type { BillingAccount, PlanCatalogEntry } from "@/lib/types";
+import type { PlanCatalogEntry } from "@/lib/types";
 import { QuotaBanner } from "@/components/QuotaBanner";
-
-type MePayload = {
-  user: { email: string; role: string };
-  entitlements: {
-    companyPlan: string;
-    storagePlan: string;
-    maxCompanies: number;
-    maxStorageBytes: number;
-    isAdmin: boolean;
-  };
-  billing: BillingAccount;
-  usage: { bytesUsed: number; updatedAt: string };
-};
+import { useMe } from "@/components/MeProvider";
 
 export default function BillingPage() {
-  const [me, setMe] = useState<MePayload | null>(null);
+  const { me, loading: meLoading } = useMe();
   const [plans, setPlans] = useState<PlanCatalogEntry[]>(PLAN_CATALOG);
   const [companyCount, setCompanyCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -27,12 +15,10 @@ export default function BillingPage() {
 
   const refresh = useCallback(async () => {
     try {
-      const [mRes, pRes, cRes] = await Promise.all([
-        fetch("/api/me"),
+      const [pRes, cRes] = await Promise.all([
         fetch("/api/billing/plans"),
         fetch("/api/companies"),
       ]);
-      if (mRes.ok) setMe((await mRes.json()) as MePayload);
       if (pRes.ok) {
         const d = (await pRes.json()) as { plans: PlanCatalogEntry[] };
         setPlans(d.plans);
@@ -65,7 +51,7 @@ export default function BillingPage() {
     }
   }
 
-  if (loading || !me) {
+  if (loading || meLoading || !me) {
     return (
       <div className="glass px-6 py-16 text-center text-sm text-[var(--text-muted)]">
         Loading billing…

@@ -13,6 +13,7 @@ import {
   getUsage,
   setBilling,
 } from "./users";
+import { CACHE_TTL, cacheGet, cacheSet, userCacheKey } from "./cache";
 import {
   adminBilling,
   entitlementsForJson,
@@ -59,11 +60,19 @@ export async function ensureAdminPrivileges(user: User): Promise<User> {
     changed = true;
   }
   if (changed) {
-    await createUser(user); // upsert
-  } else {
-    // Still ensure billing + migration even if already admin
+    await createUser(user); // upsert — invalidates user cache
   }
-  await setBilling(user.id, adminBilling());
+  // Only write billing when missing or not already admin entitlements (avoids
+  // constant Redis + cache thrash on every /api/me).
+  const billing = await getBilling(user.id);
+  const desired = adminBilling();
+  if (
+    !billing ||
+    billing.companyPlan !== desired.companyPlan ||
+    billing.storagePlan !== desired.storagePlan
+  ) {
+    await setBilling(user.id, desired);
+  }
   await maybeMigrateGlobalData(user.id);
   return user;
 }
@@ -203,15 +212,32 @@ export async function requireUser(): Promise<User | null> {
 
 export async function getMePayload(user: User) {
   user = await ensureAdminPrivileges(user);
-  const billing = (await getBilling(user.id)) ?? (
+  const ck = userCacheKey(user.id, "me");
+  const cached = cacheGet<{
+    user: PublicUser;
+    entitlements: ReturnType<typeof entitlementsForJson>;
+    billing: NonNullable<Awaited<ReturnType<typeof getBilling>>> | {
+      companyPlan: "free";
+      storagePlan: "free";
+      status: "none";
+    };
+    usage: { bytesUsed: number; updatedAt: string };
+  }>(ck);
+  if (cached) return cached;
+
+  const [billingRaw, usageRaw] = await Promise.all([
+    getBilling(user.id),
+    getUsage(user.id),
+  ]);
+  const billing = billingRaw ?? (
     user.role === "admin" ? adminBilling() : null
   );
   const entitlements = resolveEntitlements(user.role, billing);
-  const usage = (await getUsage(user.id)) ?? {
+  const usage = usageRaw ?? {
     bytesUsed: 0,
     updatedAt: new Date().toISOString(),
   };
-  return {
+  const payload = {
     user: toPublicUser(user),
     entitlements: entitlementsForJson(entitlements),
     billing: billing ?? {
@@ -221,6 +247,8 @@ export async function getMePayload(user: User) {
     },
     usage,
   };
+  cacheSet(ck, payload, CACHE_TTL.ME);
+  return payload;
 }
 
 export async function registerUser(input: {

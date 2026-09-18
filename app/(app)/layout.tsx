@@ -1,5 +1,6 @@
 import { Nav } from "@/components/Nav";
 import { AppMain } from "@/components/AppMain";
+import { MeProvider } from "@/components/MeProvider";
 
 export default function AppLayout({
   children,
@@ -7,9 +8,11 @@ export default function AppLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen">
-      <Nav />
-      <AppMain>{children}</AppMain>
-    </div>
+    <MeProvider>
+      <div className="min-h-screen">
+        <Nav />
+        <AppMain>{children}</AppMain>
+      </div>
+    </MeProvider>
   );
 }
