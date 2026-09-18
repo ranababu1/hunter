@@ -3,13 +3,14 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import clsx from "clsx";
-import { Crosshair, LayoutGrid, Columns3, Newspaper, Radio, LogOut } from "lucide-react";
+import { Crosshair, LayoutGrid, Columns3, Newspaper, Radio, Building2, LogOut } from "lucide-react";
 
 const links = [
   { href: "/", label: "Daily", icon: Newspaper },
   { href: "/board", label: "Board", icon: LayoutGrid },
   { href: "/kanban", label: "Kanban", icon: Columns3 },
   { href: "/fetches", label: "Fetches", icon: Radio },
+  { href: "/companies", label: "Companies", icon: Building2 },
 ];
 
 export function Nav() {

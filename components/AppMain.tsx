@@ -9,7 +9,9 @@ export function AppMain({ children }: { children: React.ReactNode }) {
     pathname === "/kanban" ||
     pathname.startsWith("/kanban/") ||
     pathname === "/fetches" ||
-    pathname.startsWith("/fetches/");
+    pathname.startsWith("/fetches/") ||
+    pathname === "/companies" ||
+    pathname.startsWith("/companies/");
 
   return (
     <main

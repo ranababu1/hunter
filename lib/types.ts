@@ -133,3 +133,25 @@ export interface FetchesSnapshot {
   updatedAt: string; // ISO
   companies: CompanyFetch[];
 }
+
+export type CompanyPriority = "high" | "medium" | "low";
+
+export interface CompanyProfile {
+  id: string;
+  name: string;
+  valuation: string;
+  headcount: string;
+  bangaloreArea: string;
+  industry: string;
+  careersUrl: string;
+  priority: CompanyPriority;
+  notes: string;
+  active: boolean;
+  updatedAt: string; // ISO
+}
+
+export const COMPANY_PRIORITIES: { id: CompanyPriority; label: string }[] = [
+  { id: "high", label: "High" },
+  { id: "medium", label: "Med" },
+  { id: "low", label: "Low" },
+];
