@@ -1,6 +1,6 @@
 import { promises as fs } from "fs";
 import path from "path";
-import type { DailyDigest, Job } from "./types";
+import type { DailyDigest, FetchesSnapshot, Job } from "./types";
 
 const dataDir = path.join(process.cwd(), "data");
 
@@ -52,4 +52,13 @@ export async function getAllDailyDigests(): Promise<DailyDigest[]> {
     if (d) digests.push(d);
   }
   return digests;
+}
+
+export async function getFetchesSnapshot(): Promise<FetchesSnapshot | null> {
+  try {
+    const raw = await fs.readFile(path.join(dataDir, "fetches.json"), "utf8");
+    return JSON.parse(raw) as FetchesSnapshot;
+  } catch {
+    return null;
+  }
 }

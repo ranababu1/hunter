@@ -115,3 +115,21 @@ export function statusLabel(s: KanbanStatus): string {
   }
   return s.replace(/_/g, " ");
 }
+
+export type FetchOutcome = "ok" | "zero" | "error";
+
+export interface CompanyFetch {
+  company: string;
+  careerPortal: string; // absolute URL to careers home/search
+  jobsFetched: number;
+  lastFetched: string; // YYYY-MM-DD
+  outcome: FetchOutcome;
+  issue?: string; // why zero/error / blockers
+  notes?: string;
+}
+
+export interface FetchesSnapshot {
+  runDate: string;
+  updatedAt: string; // ISO
+  companies: CompanyFetch[];
+}

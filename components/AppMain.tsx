@@ -5,7 +5,11 @@ import clsx from "clsx";
 
 export function AppMain({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const fullBleed = pathname === "/kanban" || pathname.startsWith("/kanban/");
+  const fullBleed =
+    pathname === "/kanban" ||
+    pathname.startsWith("/kanban/") ||
+    pathname === "/fetches" ||
+    pathname.startsWith("/fetches/");
 
   return (
     <main

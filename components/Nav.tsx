@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import clsx from "clsx";
-import { Crosshair, LayoutGrid, Columns3, Newspaper, LogOut } from "lucide-react";
+import { Crosshair, LayoutGrid, Columns3, Newspaper, Radio, LogOut } from "lucide-react";
 
 const links = [
   { href: "/", label: "Daily", icon: Newspaper },
   { href: "/board", label: "Board", icon: LayoutGrid },
   { href: "/kanban", label: "Kanban", icon: Columns3 },
+  { href: "/fetches", label: "Fetches", icon: Radio },
 ];
 
 export function Nav() {
@@ -48,7 +49,7 @@ export function Nav() {
                 key={href}
                 href={href}
                 className={clsx(
-                  "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition",
+                  "flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-sm transition sm:px-3",
                   active
                     ? "bg-[var(--accent-soft)] text-[var(--accent)]"
                     : "text-[var(--text-muted)] hover:text-[var(--text)]",

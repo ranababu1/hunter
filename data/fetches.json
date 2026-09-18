@@ -1,0 +1,414 @@
+{
+  "runDate": "2026-09-18",
+  "updatedAt": "2026-09-18T10:30:00+05:30",
+  "companies": [
+    {
+      "company": "Adobe",
+      "careerPortal": "https://adobe.wd5.myworkdayjobs.com/external_experienced",
+      "jobsFetched": 1,
+      "lastFetched": "2026-09-18",
+      "outcome": "ok",
+      "notes": "Workday CXS — Technical Architect Agentic AI"
+    },
+    {
+      "company": "Amazon / AWS",
+      "careerPortal": "https://www.amazon.jobs/",
+      "jobsFetched": 2,
+      "lastFetched": "2026-09-18",
+      "outcome": "ok",
+      "notes": "amazon.jobs — Senior AI SA + Agentic SA"
+    },
+    {
+      "company": "Anthropic",
+      "careerPortal": "https://job-boards.greenhouse.io/anthropic",
+      "jobsFetched": 1,
+      "lastFetched": "2026-09-18",
+      "outcome": "ok",
+      "notes": "Greenhouse — Applied AI Architect (Bangalore)"
+    },
+    {
+      "company": "Apple",
+      "careerPortal": "https://jobs.apple.com/",
+      "jobsFetched": 1,
+      "lastFetched": "2026-09-18",
+      "outcome": "ok",
+      "notes": "ML Engineer Apple Intelligence — Possible Match; JD SPA-limited"
+    },
+    {
+      "company": "Cisco",
+      "careerPortal": "https://jobs.cisco.com/",
+      "jobsFetched": 1,
+      "lastFetched": "2026-09-18",
+      "outcome": "ok",
+      "notes": "Workday — AI Operations Engineer"
+    },
+    {
+      "company": "Cloudflare",
+      "careerPortal": "https://boards.greenhouse.io/cloudflare",
+      "jobsFetched": 1,
+      "lastFetched": "2026-09-18",
+      "outcome": "ok",
+      "notes": "Greenhouse — Software Engineer, AI Agents (Bangalore)"
+    },
+    {
+      "company": "Databricks",
+      "careerPortal": "https://www.databricks.com/company/careers",
+      "jobsFetched": 1,
+      "lastFetched": "2026-09-18",
+      "outcome": "ok",
+      "notes": "Specialist SA AI/ML"
+    },
+    {
+      "company": "Flipkart",
+      "careerPortal": "https://www.flipkartcareers.com/",
+      "jobsFetched": 1,
+      "lastFetched": "2026-09-18",
+      "outcome": "ok",
+      "notes": "Consolidated board role; batch notes flagged aggregator-only verification risk"
+    },
+    {
+      "company": "Goldman Sachs",
+      "careerPortal": "https://higher.gs.com/",
+      "jobsFetched": 1,
+      "lastFetched": "2026-09-18",
+      "outcome": "ok",
+      "notes": "higher.gs.com — AI Innovation Acceleration VP"
+    },
+    {
+      "company": "Google",
+      "careerPortal": "https://www.google.com/about/careers/applications/",
+      "jobsFetched": 1,
+      "lastFetched": "2026-09-18",
+      "outcome": "ok",
+      "notes": "GenAI FDE on consolidated board (batch also verified Ads GenAI + Geo Agentic)"
+    },
+    {
+      "company": "InMobi",
+      "careerPortal": "https://boards.greenhouse.io/inmobi",
+      "jobsFetched": 1,
+      "lastFetched": "2026-09-18",
+      "outcome": "ok",
+      "notes": "Greenhouse SDE II – AI — Possible Match (3–5 yr band)"
+    },
+    {
+      "company": "Microsoft",
+      "careerPortal": "https://careers.microsoft.com/",
+      "jobsFetched": 1,
+      "lastFetched": "2026-09-18",
+      "outcome": "ok",
+      "notes": "CoreAI SWE II; Principal PM Hyderabad-primary excluded"
+    },
+    {
+      "company": "NVIDIA",
+      "careerPortal": "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite",
+      "jobsFetched": 1,
+      "lastFetched": "2026-09-18",
+      "outcome": "ok",
+      "notes": "GenAI SA-CSP; older JR posting expired (validThrough 2025-06-28)"
+    },
+    {
+      "company": "OpenAI",
+      "careerPortal": "https://openai.com/careers",
+      "jobsFetched": 2,
+      "lastFetched": "2026-09-18",
+      "outcome": "ok",
+      "notes": "Ashby/careers — Applied AI Architect + Partner AI Deployment Engineer"
+    },
+    {
+      "company": "Oracle",
+      "careerPortal": "https://careers.oracle.com/",
+      "jobsFetched": 1,
+      "lastFetched": "2026-09-18",
+      "outcome": "ok",
+      "notes": "On consolidated board; batch A initially lacked a reliable official req URL"
+    },
+    {
+      "company": "Palo Alto Networks",
+      "careerPortal": "https://jobs.paloaltonetworks.com/",
+      "jobsFetched": 2,
+      "lastFetched": "2026-09-18",
+      "outcome": "ok",
+      "notes": "Senior Staff IT SWE (AI & SAP) + Staff ML Engineer"
+    },
+    {
+      "company": "SAP Labs",
+      "careerPortal": "https://jobs.sap.com/",
+      "jobsFetched": 1,
+      "lastFetched": "2026-09-18",
+      "outcome": "ok",
+      "notes": "jobs.sap.com — 1 on board (batch also verified Expert Agentic + OCTO DistSys+AI)"
+    },
+    {
+      "company": "Thoughtworks",
+      "careerPortal": "https://www.thoughtworks.com/careers",
+      "jobsFetched": 1,
+      "lastFetched": "2026-09-18",
+      "outcome": "ok",
+      "notes": "On consolidated board"
+    },
+    {
+      "company": "Visa",
+      "careerPortal": "https://visa.wd5.myworkdayjobs.com/Visa",
+      "jobsFetched": 1,
+      "lastFetched": "2026-09-18",
+      "outcome": "ok",
+      "notes": "Workday REF080421W GenAI Architecture Sr Consultant"
+    },
+    {
+      "company": "Wells Fargo",
+      "careerPortal": "https://wf.wd1.myworkdayjobs.com/wellsfargojobs",
+      "jobsFetched": 1,
+      "lastFetched": "2026-09-18",
+      "outcome": "ok",
+      "notes": "Workday R-566518 Principal Engineer Gen AI"
+    },
+    {
+      "company": "AMD",
+      "careerPortal": "https://careers.amd.com/",
+      "jobsFetched": 0,
+      "lastFetched": "2026-09-18",
+      "outcome": "zero",
+      "issue": "Careers UI did not yield extractable Bangalore AI architect listings"
+    },
+    {
+      "company": "American Express",
+      "careerPortal": "https://aexp.eightfold.ai/careers",
+      "jobsFetched": 0,
+      "lastFetched": "2026-09-18",
+      "outcome": "zero",
+      "issue": "Bengaluru location page indicated no openings; Staff Agentic AI BuiltIn was multi-location without official aexp URL"
+    },
+    {
+      "company": "Atlassian",
+      "careerPortal": "https://www.atlassian.com/company/careers",
+      "jobsFetched": 0,
+      "lastFetched": "2026-09-18",
+      "outcome": "zero",
+      "issue": "Bangalore careers filter checked; no verified qualifying AI/architect posting extracted"
+    },
+    {
+      "company": "Broadcom / VMware",
+      "careerPortal": "https://careers.broadcom.com/",
+      "jobsFetched": 0,
+      "lastFetched": "2026-09-18",
+      "outcome": "zero",
+      "issue": "No verified Bengaluru AI/GenAI architect openings confirmed this run"
+    },
+    {
+      "company": "Cohere",
+      "careerPortal": "https://cohere.com/careers",
+      "jobsFetched": 0,
+      "lastFetched": "2026-09-18",
+      "outcome": "zero",
+      "issue": "No verified Bengaluru/Bangalore open AI roles found on official boards this run"
+    },
+    {
+      "company": "Confluent",
+      "careerPortal": "https://careers.confluent.io/",
+      "jobsFetched": 0,
+      "lastFetched": "2026-09-18",
+      "outcome": "zero",
+      "issue": "General careers; no Bengaluru GenAI/AI Architect posting verified"
+    },
+    {
+      "company": "CRED",
+      "careerPortal": "https://careers.cred.club/",
+      "jobsFetched": 0,
+      "lastFetched": "2026-09-18",
+      "outcome": "zero",
+      "issue": "No verified Bengaluru AI/GenAI posting found"
+    },
+    {
+      "company": "Elastic",
+      "careerPortal": "https://jobs.elastic.co/",
+      "jobsFetched": 0,
+      "lastFetched": "2026-09-18",
+      "outcome": "error",
+      "issue": "AI QA/Eval greenhouse IDs found but location not confirmed Bengaluru; fetch redirect issues"
+    },
+    {
+      "company": "Freshworks",
+      "careerPortal": "https://www.freshworks.com/company/careers/",
+      "jobsFetched": 0,
+      "lastFetched": "2026-09-18",
+      "outcome": "zero",
+      "issue": "SmartRecruiters Lead SWE–ML JD strong but page did not confirm Bengaluru (Hyderabad also reported)"
+    },
+    {
+      "company": "Glean",
+      "careerPortal": "https://www.glean.com/careers",
+      "jobsFetched": 0,
+      "lastFetched": "2026-09-18",
+      "outcome": "zero",
+      "issue": "No verified Bengaluru/Bangalore open AI roles found on official boards this run"
+    },
+    {
+      "company": "IBM",
+      "careerPortal": "https://www.ibm.com/careers/",
+      "jobsFetched": 0,
+      "lastFetched": "2026-09-18",
+      "outcome": "zero",
+      "issue": "careers.ibm.com GenAI+Bangalore search returned no usable JobDetail; watsonx hub only"
+    },
+    {
+      "company": "Intel",
+      "careerPortal": "https://jobs.intel.com/",
+      "jobsFetched": 0,
+      "lastFetched": "2026-09-18",
+      "outcome": "error",
+      "issue": "Careers site returned HTTP 403 from this environment"
+    },
+    {
+      "company": "Intuit",
+      "careerPortal": "https://jobs.intuit.com/",
+      "jobsFetched": 0,
+      "lastFetched": "2026-09-18",
+      "outcome": "zero",
+      "issue": "Page loaded; no verified qualifying AI architect/GenAI role confirmed"
+    },
+    {
+      "company": "JPMorgan Chase",
+      "careerPortal": "https://careers.jpmorgan.com/",
+      "jobsFetched": 0,
+      "lastFetched": "2026-09-18",
+      "outcome": "zero",
+      "issue": "Evenbreak listed Director Applied AI ML (Bengaluru) but no official jpmorganchase.com/Workday URL found"
+    },
+    {
+      "company": "Mastercard",
+      "careerPortal": "https://careers.mastercard.com/",
+      "jobsFetched": 0,
+      "lastFetched": "2026-09-18",
+      "outcome": "zero",
+      "issue": "India AI Engineer hits pointed to Gurgaon/Pune; no Bengaluru GenAI/architect posting verified"
+    },
+    {
+      "company": "Meesho",
+      "careerPortal": "https://meesho.io/careers",
+      "jobsFetched": 0,
+      "lastFetched": "2026-09-18",
+      "outcome": "zero",
+      "issue": "Apna aggregator EM–AI Engineering Bengaluru JD looks strong; no official Meesho careers URL confirmed open"
+    },
+    {
+      "company": "Meta",
+      "careerPortal": "https://www.metacareers.com/",
+      "jobsFetched": 0,
+      "lastFetched": "2026-09-18",
+      "outcome": "error",
+      "issue": "metacareers.com returned SPA shells / HTTP 400 on job detail URLs — could not verify open Bengaluru GenAI Partner Engineer posting"
+    },
+    {
+      "company": "Mistral AI",
+      "careerPortal": "https://mistral.ai/careers",
+      "jobsFetched": 0,
+      "lastFetched": "2026-09-18",
+      "outcome": "zero",
+      "issue": "No verified Bengaluru/Bangalore open AI roles found on official boards this run"
+    },
+    {
+      "company": "Nutanix",
+      "careerPortal": "https://www.nutanix.com/careers",
+      "jobsFetched": 0,
+      "lastFetched": "2026-09-18",
+      "outcome": "error",
+      "issue": "Staff Engineer/Tech Lead AI/ML careers URL returned 404"
+    },
+    {
+      "company": "Perplexity",
+      "careerPortal": "https://www.perplexity.ai/careers",
+      "jobsFetched": 0,
+      "lastFetched": "2026-09-18",
+      "outcome": "zero",
+      "issue": "No verified Bengaluru/Bangalore open AI roles found on official boards this run"
+    },
+    {
+      "company": "PhonePe",
+      "careerPortal": "https://www.phonepe.com/careers/",
+      "jobsFetched": 0,
+      "lastFetched": "2026-09-18",
+      "outcome": "zero",
+      "issue": "Greenhouse Staff Engineer found was Kafka infra, not AI"
+    },
+    {
+      "company": "Qualcomm",
+      "careerPortal": "https://careers.qualcomm.com/",
+      "jobsFetched": 0,
+      "lastFetched": "2026-09-18",
+      "outcome": "zero",
+      "issue": "Careers search; no verified Bengaluru AI Platform/architect JD confirmed"
+    },
+    {
+      "company": "Razorpay",
+      "careerPortal": "https://razorpay.com/jobs/",
+      "jobsFetched": 0,
+      "lastFetched": "2026-09-18",
+      "outcome": "zero",
+      "issue": "Lead AI Engineer (inference platform) marked no longer accepting on TCV board"
+    },
+    {
+      "company": "Red Hat",
+      "careerPortal": "https://www.redhat.com/en/jobs",
+      "jobsFetched": 0,
+      "lastFetched": "2026-09-18",
+      "outcome": "zero",
+      "issue": "AI Engineering hub page only; Principal SWE–AI aggregators without live redhat.com job URL"
+    },
+    {
+      "company": "Rubrik",
+      "careerPortal": "https://www.rubrik.com/company/careers",
+      "jobsFetched": 0,
+      "lastFetched": "2026-09-18",
+      "outcome": "zero",
+      "issue": "Senior SWE Enterprise AI (gh_jid 7849713) reported removed ~May 2026 on BuiltIn"
+    },
+    {
+      "company": "Salesforce",
+      "careerPortal": "https://careers.salesforce.com/",
+      "jobsFetched": 0,
+      "lastFetched": "2026-09-18",
+      "outcome": "error",
+      "issue": "Workday path JR333491 returned postingAvailable: false — treated as closed/unavailable"
+    },
+    {
+      "company": "Scale AI",
+      "careerPortal": "https://scale.com/careers",
+      "jobsFetched": 0,
+      "lastFetched": "2026-09-18",
+      "outcome": "zero",
+      "issue": "No verified Bengaluru/Bangalore open AI roles found on official boards this run"
+    },
+    {
+      "company": "ServiceNow",
+      "careerPortal": "https://careers.servicenow.com/",
+      "jobsFetched": 0,
+      "lastFetched": "2026-09-18",
+      "outcome": "error",
+      "issue": "careers.servicenow.com agentic URL returned 404"
+    },
+    {
+      "company": "Snowflake",
+      "careerPortal": "https://careers.snowflake.com/",
+      "jobsFetched": 0,
+      "lastFetched": "2026-09-18",
+      "outcome": "zero",
+      "issue": "Careers search thin/SPA; no verified Bengaluru AI architect JD captured"
+    },
+    {
+      "company": "Swiggy",
+      "careerPortal": "https://careers.swiggy.com/",
+      "jobsFetched": 0,
+      "lastFetched": "2026-09-18",
+      "outcome": "error",
+      "issue": "careers.swiggy.com fetch timed out / no open JD URL confirmed; LinkedIn hiring posts only"
+    },
+    {
+      "company": "Walmart Global Tech",
+      "careerPortal": "https://careers.walmart.com/",
+      "jobsFetched": 0,
+      "lastFetched": "2026-09-18",
+      "outcome": "zero",
+      "issue": "BuiltIn Staff Data Scientist GenAI/agentic (Bangalore) removed Jul 28 2026; no replacement verified"
+    }
+  ]
+}
