@@ -14,6 +14,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import clsx from "clsx";
 import type { CompanyPriority, CompanyProfile } from "@/lib/types";
 import { COMPANY_PRIORITIES } from "@/lib/types";
+import Link from "next/link";
+import { QuotaBanner } from "@/components/QuotaBanner";
 
 type SortKey = "name" | "priority";
 
@@ -84,6 +86,10 @@ export function CompaniesView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [redisAvailable, setRedisAvailable] = useState(true);
+  const [maxCompanies, setMaxCompanies] = useState(10);
+  const [bytesUsed, setBytesUsed] = useState(0);
+  const [maxStorageBytes, setMaxStorageBytes] = useState(2 * 1024 * 1024);
+  const [limitNudge, setLimitNudge] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [modal, setModal] = useState<
@@ -99,14 +105,36 @@ export function CompaniesView() {
 
   const refresh = useCallback(async () => {
     try {
-      const res = await fetch("/api/companies");
+      const [res, meRes] = await Promise.all([
+        fetch("/api/companies"),
+        fetch("/api/me"),
+      ]);
       if (!res.ok) throw new Error("Failed to load companies");
       const data = (await res.json()) as {
         companies: CompanyProfile[];
         redisAvailable?: boolean;
+        entitlements?: { maxCompanies?: number };
       };
       setCompanies(data.companies ?? []);
       setRedisAvailable(data.redisAvailable !== false);
+      if (data.entitlements?.maxCompanies != null) {
+        const m = data.entitlements.maxCompanies;
+        setMaxCompanies(m < 0 ? Number.POSITIVE_INFINITY : m);
+      }
+      if (meRes.ok) {
+        const me = (await meRes.json()) as {
+          usage?: { bytesUsed?: number };
+          entitlements?: { maxStorageBytes?: number; maxCompanies?: number };
+        };
+        if (me.usage?.bytesUsed != null) setBytesUsed(me.usage.bytesUsed);
+        if (me.entitlements?.maxStorageBytes != null) {
+          setMaxStorageBytes(me.entitlements.maxStorageBytes);
+        }
+        if (me.entitlements?.maxCompanies != null) {
+          const m = me.entitlements.maxCompanies;
+          setMaxCompanies(m < 0 ? Number.POSITIVE_INFINITY : m);
+        }
+      }
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Load failed");
@@ -155,6 +183,16 @@ export function CompaniesView() {
   }, [companies, query, sortKey]);
 
   function openAdd() {
+    if (
+      Number.isFinite(maxCompanies) &&
+      companies.length >= maxCompanies
+    ) {
+      setLimitNudge(
+        `Company limit reached (${companies.length} / ${maxCompanies}). Upgrade for $5/20, $10/45, or $20/100.`,
+      );
+      return;
+    }
+    setLimitNudge(null);
     setForm(emptyForm());
     setFormError(null);
     setModal({ mode: "add" });
@@ -215,7 +253,29 @@ export function CompaniesView() {
       };
       if (!res.ok) {
         setCompanies(prev);
-        setFormError(data.error ?? "Save failed");
+        const errData = data as {
+          error?: string;
+          kind?: string;
+          message?: string;
+          limit?: number;
+          used?: number;
+        };
+        if (errData.error === "PLAN_LIMIT") {
+          setFormError(
+            errData.message ??
+              `Company limit reached (${errData.used} / ${errData.limit}). Upgrade for $5/20, $10/45, or $20/100.`,
+          );
+          setLimitNudge(
+            errData.message ??
+              `Company limit reached. Upgrade tiers: $5 → 20, $10 → 45, $20 → 100.`,
+          );
+        } else if (errData.error === "QUOTA_EXCEEDED") {
+          setFormError(
+            errData.message ?? "Free tier maxxed out. Continue for $10/mo",
+          );
+        } else {
+          setFormError(data.error ?? "Save failed");
+        }
         return;
       }
       if (data.companies) setCompanies(data.companies);
@@ -269,15 +329,44 @@ export function CompaniesView() {
             priority. Edits persist in Redis.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={openAdd}
-          className="inline-flex items-center justify-center gap-2 rounded-full border border-[rgba(45,212,191,0.35)] bg-[var(--accent-soft)] px-4 py-2 text-sm font-medium text-[var(--accent)] transition hover:bg-[rgba(45,212,191,0.2)]"
-        >
-          <Plus className="h-4 w-4" />
-          Add company
-        </button>
+        <div className="flex flex-col items-end gap-2">
+          <span className="tabular-nums text-sm text-[var(--text-dim)]">
+            {companies.length}
+            {Number.isFinite(maxCompanies) ? ` / ${maxCompanies}` : " / ∞"}{" "}
+            companies
+          </span>
+          <button
+            type="button"
+            onClick={openAdd}
+            disabled={
+              Number.isFinite(maxCompanies) &&
+              companies.length >= maxCompanies
+            }
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-[rgba(45,212,191,0.35)] bg-[var(--accent-soft)] px-4 py-2 text-sm font-medium text-[var(--accent)] transition hover:bg-[rgba(45,212,191,0.2)] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Plus className="h-4 w-4" />
+            Add company
+          </button>
+        </div>
       </div>
+
+      <QuotaBanner
+        bytesUsed={bytesUsed}
+        maxStorageBytes={maxStorageBytes}
+        companyCount={companies.length}
+        maxCompanies={
+          Number.isFinite(maxCompanies) ? maxCompanies : undefined
+        }
+      />
+
+      {limitNudge && (
+        <div className="glass rounded-xl border border-[rgba(210,153,34,0.35)] px-4 py-3 text-sm text-[var(--good)]">
+          {limitNudge}{" "}
+          <Link href="/billing" className="text-[var(--accent)] underline">
+            View billing
+          </Link>
+        </div>
+      )}
 
       {!redisAvailable && (
         <div className="glass rounded-xl border border-[rgba(210,153,34,0.35)] px-4 py-3 text-sm text-[var(--good)]">

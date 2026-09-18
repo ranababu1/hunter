@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
-import { checkPassword, createSessionToken, getSessionCookieName } from "@/lib/auth";
+import {
+  loginWithEmailPassword,
+  loginWithSitePassword,
+  setSessionCookies,
+  toPublicUser,
+} from "@/lib/auth";
+import { maybeMigrateGlobalData } from "@/lib/users";
 
 export async function POST(request: Request) {
-  let body: { password?: string } = {};
+  let body: { email?: string; password?: string } = {};
   try {
     body = await request.json();
   } catch {
@@ -10,21 +16,39 @@ export async function POST(request: Request) {
   }
 
   const password = body.password ?? "";
-  if (!checkPassword(password)) {
-    return NextResponse.json({ error: "Invalid password" }, { status: 401 });
+  const email = body.email?.trim();
+
+  let result:
+    | { user: import("@/lib/types").User }
+    | { error: string; status: number };
+
+  if (email) {
+    result = await loginWithEmailPassword(email, password);
+  } else if (password) {
+    // Legacy SITE_PASSWORD → admin
+    result = await loginWithSitePassword(password);
+  } else {
+    return NextResponse.json(
+      { error: "email and password required" },
+      { status: 400 },
+    );
   }
 
-  const token = createSessionToken(
-    process.env.SITE_PASSWORD ?? password,
-  );
+  if ("error" in result) {
+    return NextResponse.json(
+      { error: result.error },
+      { status: result.status },
+    );
+  }
 
-  const res = NextResponse.json({ ok: true });
-  res.cookies.set(getSessionCookieName(), token, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 30,
+  if (result.user.role === "admin") {
+    await maybeMigrateGlobalData(result.user.id);
+  }
+
+  const res = NextResponse.json({
+    ok: true,
+    user: toPublicUser(result.user),
   });
+  await setSessionCookies(res, result.user.id);
   return res;
 }

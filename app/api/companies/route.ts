@@ -1,5 +1,14 @@
 import { NextResponse } from "next/server";
-import { getCompanies, saveCompanies } from "@/lib/redis";
+import { requireUser } from "@/lib/auth";
+import {
+  checkCompanyLimit,
+  checkStorageQuota,
+  getCompanies,
+  projectedBytesWithCompanies,
+  saveCompanies,
+} from "@/lib/redis";
+import { getBilling } from "@/lib/users";
+import { entitlementsForJson, resolveEntitlements } from "@/lib/plans";
 import type { CompanyPriority, CompanyProfile } from "@/lib/types";
 
 const PRIORITIES = new Set<CompanyPriority>(["high", "medium", "low"]);
@@ -81,11 +90,30 @@ function validateBody(
 }
 
 export async function GET() {
-  const { companies, fromSeed, redisAvailable } = await getCompanies();
-  return NextResponse.json({ companies, fromSeed, redisAvailable });
+  const user = await requireUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const { companies, fromSeed, redisAvailable } = await getCompanies(user.id);
+  const billing = await getBilling(user.id);
+  const entitlements = entitlementsForJson(
+    resolveEntitlements(user.role, billing),
+  );
+  return NextResponse.json({
+    companies,
+    fromSeed,
+    redisAvailable,
+    entitlements,
+    companyCount: companies.length,
+  });
 }
 
 export async function POST(request: Request) {
+  const user = await requireUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   let body: Record<string, unknown> = {};
   try {
     body = await request.json();
@@ -98,7 +126,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
 
-  const { companies, redisAvailable } = await getCompanies();
+  const { companies, redisAvailable } = await getCompanies(user.id);
   if (!redisAvailable) {
     return NextResponse.json(
       {
@@ -107,6 +135,11 @@ export async function POST(request: Request) {
       },
       { status: 503 },
     );
+  }
+
+  const planErr = await checkCompanyLimit(user, companies.length + 1);
+  if (planErr) {
+    return NextResponse.json(planErr, { status: 402 });
   }
 
   const ids = new Set(companies.map((c) => c.id));
@@ -129,7 +162,14 @@ export async function POST(request: Request) {
   const next = [...companies, company].sort((a, b) =>
     a.name.localeCompare(b.name),
   );
-  const ok = await saveCompanies(next);
+
+  const projected = await projectedBytesWithCompanies(user.id, next);
+  const quotaErr = await checkStorageQuota(user, projected);
+  if (quotaErr) {
+    return NextResponse.json(quotaErr, { status: 402 });
+  }
+
+  const ok = await saveCompanies(user.id, next);
   if (!ok) {
     return NextResponse.json(
       { error: "Failed to write companies to Redis" },
@@ -140,6 +180,11 @@ export async function POST(request: Request) {
 }
 
 export async function PUT(request: Request) {
+  const user = await requireUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   let body: Record<string, unknown> = {};
   try {
     body = await request.json();
@@ -157,7 +202,7 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: parsed.error }, { status: 400 });
   }
 
-  const { companies, redisAvailable } = await getCompanies();
+  const { companies, redisAvailable } = await getCompanies(user.id);
   if (!redisAvailable) {
     return NextResponse.json(
       {
@@ -185,7 +230,13 @@ export async function PUT(request: Request) {
   next[idx] = updated;
   next.sort((a, b) => a.name.localeCompare(b.name));
 
-  const ok = await saveCompanies(next);
+  const projected = await projectedBytesWithCompanies(user.id, next);
+  const quotaErr = await checkStorageQuota(user, projected);
+  if (quotaErr) {
+    return NextResponse.json(quotaErr, { status: 402 });
+  }
+
+  const ok = await saveCompanies(user.id, next);
   if (!ok) {
     return NextResponse.json(
       { error: "Failed to write companies to Redis" },
@@ -196,6 +247,11 @@ export async function PUT(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const user = await requireUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const url = new URL(request.url);
   let id = url.searchParams.get("id") ?? "";
 
@@ -212,7 +268,7 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: "id is required" }, { status: 400 });
   }
 
-  const { companies, redisAvailable } = await getCompanies();
+  const { companies, redisAvailable } = await getCompanies(user.id);
   if (!redisAvailable) {
     return NextResponse.json(
       {
@@ -228,7 +284,7 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: "Company not found" }, { status: 404 });
   }
 
-  const ok = await saveCompanies(next);
+  const ok = await saveCompanies(user.id, next);
   if (!ok) {
     return NextResponse.json(
       { error: "Failed to write companies to Redis" },

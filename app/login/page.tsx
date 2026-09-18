@@ -1,13 +1,16 @@
 "use client";
 
 import { FormEvent, useState, Suspense } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Lock, ArrowRight, Crosshair } from "lucide-react";
+import { Lock, Mail, ArrowRight, Crosshair } from "lucide-react";
 
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [legacy, setLegacy] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -16,13 +19,17 @@ function LoginForm() {
     setLoading(true);
     setError("");
     try {
+      const body = legacy
+        ? { password }
+        : { email: email.trim(), password };
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify(body),
       });
+      const data = (await res.json()) as { error?: string };
       if (!res.ok) {
-        setError("Incorrect password.");
+        setError(data.error ?? "Login failed.");
         setLoading(false);
         return;
       }
@@ -49,23 +56,44 @@ function LoginForm() {
         </div>
         <div>
           <div className="wordmark text-2xl">Hunter</div>
-          <div className="eyebrow mt-1">Private job HQ</div>
+          <div className="eyebrow mt-1">Multi-user portal</div>
         </div>
       </div>
 
       <h1 className="prose-title mb-2 text-2xl text-[var(--text)]">Sign in</h1>
       <p className="mb-8 text-sm leading-relaxed text-[var(--text-muted)]">
-        Password-gated access to your daily digest, board, and kanban.
+        Email and password access to your daily digest, board, and kanban.
       </p>
 
+      {!legacy && (
+        <>
+          <label className="mb-2 block text-xs font-medium tracking-wide text-[var(--text-dim)]">
+            EMAIL
+          </label>
+          <div className="relative mb-4">
+            <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-dim)]" />
+            <input
+              type="email"
+              autoFocus
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              className="w-full rounded-xl border border-[var(--border-strong)] bg-[var(--bg)] py-3 pl-10 pr-4 text-[var(--text)] outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
+            />
+          </div>
+        </>
+      )}
+
       <label className="mb-2 block text-xs font-medium tracking-wide text-[var(--text-dim)]">
-        SITE PASSWORD
+        {legacy ? "SITE PASSWORD" : "PASSWORD"}
       </label>
       <div className="relative mb-4">
         <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-dim)]" />
         <input
           type="password"
-          autoFocus
+          autoFocus={legacy}
+          autoComplete={legacy ? "current-password" : "current-password"}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="••••••••"
@@ -81,13 +109,26 @@ function LoginForm() {
 
       <button
         type="submit"
-        disabled={loading || !password}
+        disabled={loading || !password || (!legacy && !email)}
         className="group flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 font-medium text-[#0d1117] transition disabled:opacity-50"
         style={{ background: "var(--accent)" }}
       >
-        {loading ? "Unlocking…" : "Unlock"}
+        {loading ? "Signing in…" : "Sign in"}
         <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
       </button>
+
+      <div className="mt-6 flex flex-col gap-2 text-center text-sm text-[var(--text-muted)]">
+        <Link href="/register" className="text-[var(--accent)] hover:underline">
+          Create an account
+        </Link>
+        <button
+          type="button"
+          onClick={() => setLegacy((v) => !v)}
+          className="text-xs text-[var(--text-dim)] hover:text-[var(--text-muted)]"
+        >
+          {legacy ? "Use email & password" : "Admin: site password login"}
+        </button>
+      </div>
     </form>
   );
 }

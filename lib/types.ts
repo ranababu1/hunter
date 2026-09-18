@@ -155,3 +155,94 @@ export const COMPANY_PRIORITIES: { id: CompanyPriority; label: string }[] = [
   { id: "medium", label: "Med" },
   { id: "low", label: "Low" },
 ];
+
+// ── Multi-user Phase 1 ──────────────────────────────────────────────
+
+export type UserRole = "admin" | "user";
+
+export type CompanyPlanId = "free" | "cos_20" | "cos_45" | "cos_100" | "unlimited";
+export type StoragePlanId = "free" | "plus" | "unlimited";
+
+export type BillingStatus = "none" | "active" | "past_due" | "canceled";
+
+export interface User {
+  id: string;
+  email: string;
+  passwordHash: string;
+  name: string;
+  role: UserRole;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Public user shape (no password hash). */
+export interface PublicUser {
+  id: string;
+  email: string;
+  name: string;
+  role: UserRole;
+  createdAt: string;
+}
+
+export interface Entitlements {
+  companyPlan: CompanyPlanId;
+  storagePlan: StoragePlanId;
+  maxCompanies: number; // Infinity serialized as -1 for JSON
+  maxStorageBytes: number;
+  isAdmin: boolean;
+}
+
+export interface BillingAccount {
+  companyPlan: CompanyPlanId;
+  storagePlan: StoragePlanId;
+  stripeCustomerId?: string;
+  stripeSubscriptionId?: string;
+  stripePriceIds?: string[];
+  status: BillingStatus;
+  currentPeriodEnd?: string;
+}
+
+export interface UsageMeter {
+  bytesUsed: number;
+  updatedAt: string;
+}
+
+export interface TargetRole {
+  id: string;
+  label: string;
+}
+
+export interface ResumeMeta {
+  fileName?: string;
+  mimeType?: string;
+  uploadedAt?: string;
+  charCount?: number;
+}
+
+export interface UserProfile {
+  displayName: string;
+  resumeText: string;
+  resumeMeta: ResumeMeta;
+  targetRoles: TargetRole[];
+  updatedAt: string;
+}
+
+export interface PlanCatalogEntry {
+  id: string;
+  kind: "company" | "storage";
+  label: string;
+  maxCompanies?: number;
+  maxStorageBytes?: number;
+  monthlyPriceUsd: number | null;
+  description: string;
+}
+
+export type LimitErrorKind = "storage" | "companies";
+
+export interface QuotaErrorBody {
+  error: "QUOTA_EXCEEDED" | "PLAN_LIMIT";
+  kind: LimitErrorKind;
+  limit: number;
+  used: number;
+  message?: string;
+}

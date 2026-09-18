@@ -4,15 +4,19 @@ import {
   listDailyDates,
 } from "@/lib/jobs";
 import { getAppState } from "@/lib/redis";
+import { requireUser } from "@/lib/auth";
 import { DailyView } from "@/components/DailyView";
 
 export const dynamic = "force-dynamic";
 
 export default async function DailyPage() {
+  const user = await requireUser();
   const [dates, digests, state, allJobs] = await Promise.all([
     listDailyDates(),
     getAllDailyDigests(),
-    getAppState(),
+    user
+      ? getAppState(user.id)
+      : Promise.resolve({ visited: [] as string[], status: {} }),
     getConsolidatedJobs(),
   ]);
 

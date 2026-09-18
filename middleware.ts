@@ -1,9 +1,18 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const COOKIE = "hunter_session";
+const UID_COOKIE = "hunter_uid";
+const SESSION_COOKIE = "hunter_session";
 
-async function hmacHex(secret: string, message: string): Promise<string> {
+async function verifySessionEdge(
+  userId: string | undefined,
+  token: string | undefined,
+  secret: string | null,
+): Promise<boolean> {
+  if (!userId || !token) return false;
+  if (!secret) {
+    return token === `dev:${userId}`;
+  }
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey(
     "raw",
@@ -12,51 +21,61 @@ async function hmacHex(secret: string, message: string): Promise<string> {
     false,
     ["sign"],
   );
-  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(message));
-  return Array.from(new Uint8Array(sig))
+  const sig = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    enc.encode(`hunter:uid:${userId}`),
+  );
+  const expected = Array.from(new Uint8Array(sig))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
-}
-
-function timingSafeEqualHex(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
+  if (expected.length !== token.length) return false;
   let out = 0;
-  for (let i = 0; i < a.length; i++) {
-    out |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  for (let i = 0; i < expected.length; i++) {
+    out |= expected.charCodeAt(i) ^ token.charCodeAt(i);
   }
   return out === 0;
+}
+
+const PUBLIC_PREFIXES = [
+  "/login",
+  "/register",
+  "/api/auth/login",
+  "/api/auth/register",
+  "/_next",
+  "/favicon",
+];
+
+function isPublic(pathname: string): boolean {
+  if (pathname === "/icon.svg") return true;
+  return PUBLIC_PREFIXES.some(
+    (p) => pathname === p || pathname.startsWith(p + "/"),
+  );
 }
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (
-    pathname === "/login" ||
-    pathname.startsWith("/api/auth/login") ||
-    pathname.startsWith("/_next") ||
-    pathname.startsWith("/favicon") ||
-    pathname === "/icon.svg"
-  ) {
+  if (isPublic(pathname)) {
     return NextResponse.next();
   }
 
-  const password = process.env.SITE_PASSWORD;
+  const secret =
+    process.env.AUTH_SECRET || process.env.SITE_PASSWORD || null;
 
-  if (!password) {
-    if (process.env.NODE_ENV !== "production") {
-      console.warn(
-        "[hunter] SITE_PASSWORD not set — allowing all routes (dev only).",
-      );
-    }
+  const uid = request.cookies.get(UID_COOKIE)?.value;
+  const token = request.cookies.get(SESSION_COOKIE)?.value;
+
+  if (await verifySessionEdge(uid, token, secret)) {
     return NextResponse.next();
   }
 
-  const token = request.cookies.get(COOKIE)?.value;
-  if (token) {
-    const expected = await hmacHex(password, `hunter:${password}`);
-    if (timingSafeEqualHex(token, expected)) {
-      return NextResponse.next();
-    }
+  // Dev soft-open: no secret configured → allow (with warning)
+  if (!secret && process.env.NODE_ENV !== "production") {
+    console.warn(
+      "[hunter] AUTH_SECRET/SITE_PASSWORD not set — allowing routes without session (dev only).",
+    );
+    return NextResponse.next();
   }
 
   if (pathname.startsWith("/api/")) {

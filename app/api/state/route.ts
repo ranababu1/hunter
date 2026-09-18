@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { requireUser } from "@/lib/auth";
 import { getAppState, patchJobState } from "@/lib/redis";
 import type { KanbanStatus } from "@/lib/types";
 import { ALL_STATUSES, normalizeStatus } from "@/lib/types";
@@ -6,7 +7,11 @@ import { ALL_STATUSES, normalizeStatus } from "@/lib/types";
 const VALID = new Set(ALL_STATUSES.map((c) => c.id));
 
 export async function GET() {
-  const state = await getAppState();
+  const user = await requireUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const state = await getAppState(user.id);
   const status: Record<string, KanbanStatus> = {};
   for (const [k, v] of Object.entries(state.status)) {
     status[k] = normalizeStatus(v);
@@ -15,6 +20,11 @@ export async function GET() {
 }
 
 export async function PATCH(request: Request) {
+  const user = await requireUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   let body: {
     jobId?: string;
     visited?: boolean;
@@ -33,16 +43,13 @@ export async function PATCH(request: Request) {
   let status: KanbanStatus | undefined;
   if (body.status) {
     const normalized = normalizeStatus(body.status);
-    if (!VALID.has(normalized) && body.status !== normalized) {
-      // allow legacy via normalize, but reject unknown
-    }
     if (!VALID.has(normalized)) {
       return NextResponse.json({ error: "Invalid status" }, { status: 400 });
     }
     status = normalized;
   }
 
-  const state = await patchJobState(body.jobId, {
+  const state = await patchJobState(user.id, body.jobId, {
     visited: body.visited,
     status,
   });
