@@ -5,18 +5,20 @@ import type { AppState, DailyDigest, Job, KanbanStatus } from "@/lib/types";
 import { normalizeStatus } from "@/lib/types";
 import { JobCard } from "./JobCard";
 import { JobDrawer } from "./JobDrawer";
-import { StatStrip } from "./StatStrip";
+import { HomeMetrics } from "./HomeMetrics";
 
 export function DailyView({
   dates,
   digests,
   initialDate,
   initialState,
+  allJobs,
 }: {
   dates: string[];
   digests: DailyDigest[];
   initialDate: string;
   initialState: AppState;
+  allJobs: Job[];
 }) {
   const [state, setState] = useState<AppState>(() => ({
     visited: initialState.visited,
@@ -105,10 +107,6 @@ export function DailyView({
     );
   }, [jobs]);
 
-  const visitedForDay = useMemo(
-    () => jobs.filter((j) => visitedSet.has(j.id)).length,
-    [jobs, visitedSet],
-  );
 
   return (
     <div className="space-y-8 fade-up">
@@ -139,7 +137,13 @@ export function DailyView({
         )}
       </div>
 
-      <StatStrip jobs={jobs} visitedCount={visitedForDay} />
+      <HomeMetrics
+        allJobs={allJobs}
+        digestJobs={jobs}
+        digestDate={date}
+        latestDate={dates[0] ?? date}
+        state={state}
+      />
 
       <div className="grid gap-3 md:grid-cols-2">
         {sorted.map((job) => (

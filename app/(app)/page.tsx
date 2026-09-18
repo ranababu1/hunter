@@ -1,5 +1,6 @@
 import {
   getAllDailyDigests,
+  getConsolidatedJobs,
   listDailyDates,
 } from "@/lib/jobs";
 import { getAppState } from "@/lib/redis";
@@ -8,10 +9,11 @@ import { DailyView } from "@/components/DailyView";
 export const dynamic = "force-dynamic";
 
 export default async function DailyPage() {
-  const [dates, digests, state] = await Promise.all([
+  const [dates, digests, state, allJobs] = await Promise.all([
     listDailyDates(),
     getAllDailyDigests(),
     getAppState(),
+    getConsolidatedJobs(),
   ]);
 
   if (digests.length === 0) {
@@ -31,6 +33,7 @@ export default async function DailyPage() {
       digests={digests}
       initialDate={initialDate}
       initialState={state}
+      allJobs={allJobs}
     />
   );
 }
