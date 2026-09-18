@@ -166,6 +166,10 @@ export interface CompanyProfile {
   notes: string;
   active: boolean;
   updatedAt: string; // ISO
+  /** false = problematic portal; true/undefined = ok (legacy ok) */
+  portalOk?: boolean;
+  /** short reason when portalOk===false */
+  portalIssue?: string;
 }
 
 export const COMPANY_PRIORITIES: { id: CompanyPriority; label: string }[] = [

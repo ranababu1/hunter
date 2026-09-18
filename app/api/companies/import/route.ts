@@ -8,7 +8,12 @@ import {
 } from "@/lib/redis";
 import { getBilling } from "@/lib/users";
 import { entitlementsForJson, resolveEntitlements } from "@/lib/plans";
-import { uniqueId } from "@/lib/companies";
+import {
+  checkPortalUrl,
+  looksLikeHttpUrl,
+  mapPool,
+  uniqueId,
+} from "@/lib/companies";
 import type { CompanyProfile, QuotaErrorBody } from "@/lib/types";
 
 type Skipped = { name: string; reason: string };
@@ -18,6 +23,7 @@ type ImportResult = {
   imported: number;
   updated: number;
   skipped: Skipped[];
+  problematic: number;
   redisAvailable: boolean;
   entitlements: ReturnType<typeof entitlementsForJson>;
 };
@@ -54,12 +60,29 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const mapping = isRecord(body) && "mapping" in body ? body.mapping : body;
-  if (!isRecord(mapping)) {
+  if (!isRecord(body)) {
     return NextResponse.json(
       { error: "Expected a JSON object mapping company names to URLs" },
       { status: 400 },
     );
+  }
+
+  let validatePortals = false;
+  let mapping: Record<string, unknown>;
+
+  if ("mapping" in body) {
+    if (!isRecord(body.mapping)) {
+      return NextResponse.json(
+        { error: "Expected a JSON object mapping company names to URLs" },
+        { status: 400 },
+      );
+    }
+    mapping = body.mapping;
+    validatePortals = body.validatePortals === true;
+  } else {
+    // Raw mapping object — validatePortals defaults false
+    mapping = body;
+    validatePortals = false;
   }
 
   const { companies, redisAvailable } = await getCompanies(user.id);
@@ -71,6 +94,7 @@ export async function POST(request: Request) {
     imported: 0,
     updated: 0,
     skipped: [],
+    problematic: 0,
     redisAvailable,
     entitlements,
   };
@@ -89,7 +113,14 @@ export async function POST(request: Request) {
     next.map((company, index) => [company.name.trim().toLowerCase(), index]),
   );
   const skipped: Skipped[] = [];
-  const parsedEntries: { name: string; url: string; key: string }[] = [];
+  type ParsedEntry = {
+    name: string;
+    url: string;
+    key: string;
+    portalOk?: boolean;
+    portalIssue?: string;
+  };
+  const parsedEntries: ParsedEntry[] = [];
 
   for (const [rawName, rawUrl] of Object.entries(mapping)) {
     const name = rawName.trim();
@@ -97,7 +128,7 @@ export async function POST(request: Request) {
       skipped.push({ name: rawName, reason: "Company name is empty" });
       continue;
     }
-    if (typeof rawUrl !== "string" || !/^https?:\/\//i.test(rawUrl.trim())) {
+    if (typeof rawUrl !== "string" || !looksLikeHttpUrl(rawUrl)) {
       skipped.push({
         name,
         reason: "URL must start with http:// or https://",
@@ -112,15 +143,35 @@ export async function POST(request: Request) {
     parsedEntries.push({ name, url: rawUrl.trim().slice(0, 500), key });
   }
 
+  if (validatePortals && parsedEntries.length > 0) {
+    const checks = await mapPool(parsedEntries, 5, async (entry) => {
+      const result = await checkPortalUrl(entry.url);
+      return { key: entry.key, result };
+    });
+    const byKey = new Map(checks.map((c) => [c.key, c.result]));
+    for (const entry of parsedEntries) {
+      const result = byKey.get(entry.key);
+      if (!result) continue;
+      if (result.ok) {
+        entry.portalOk = true;
+        entry.portalIssue = undefined;
+      } else {
+        entry.portalOk = false;
+        entry.portalIssue = result.issue;
+      }
+    }
+  }
+
   const existingEntries = parsedEntries.filter((entry) => names.has(entry.key));
   const newEntries = parsedEntries.filter((entry) => !names.has(entry.key));
   let imported = 0;
   let updated = 0;
+  let problematic = 0;
   let planLimit: QuotaErrorBody | null = null;
   let storageLimit: QuotaErrorBody | null = null;
 
   async function tryApply(
-    entry: { name: string; url: string; key: string },
+    entry: ParsedEntry,
     mode: "update" | "new",
   ): Promise<void> {
     const existingIndex = names.get(entry.key);
@@ -129,11 +180,26 @@ export async function POST(request: Request) {
     let candidate: CompanyProfile[];
     if (mode === "update") {
       candidate = [...next];
-      candidate[existingIndex!] = {
-        ...candidate[existingIndex!],
+      const prev = candidate[existingIndex!];
+      const updatedRow: CompanyProfile = {
+        ...prev,
         careersUrl: entry.url,
         updatedAt: now,
       };
+      if (validatePortals) {
+        if (entry.portalOk === false) {
+          updatedRow.portalOk = false;
+          updatedRow.portalIssue = entry.portalIssue;
+        } else {
+          updatedRow.portalOk = true;
+          delete updatedRow.portalIssue;
+        }
+      } else {
+        // New URL without live check — clear prior flags (legacy ok)
+        delete updatedRow.portalOk;
+        delete updatedRow.portalIssue;
+      }
+      candidate[existingIndex!] = updatedRow;
     } else {
       const company: CompanyProfile = {
         id: uniqueId(entry.name, ids),
@@ -148,6 +214,14 @@ export async function POST(request: Request) {
         active: true,
         updatedAt: now,
       };
+      if (validatePortals) {
+        if (entry.portalOk === false) {
+          company.portalOk = false;
+          if (entry.portalIssue) company.portalIssue = entry.portalIssue;
+        } else {
+          company.portalOk = true;
+        }
+      }
       candidate = [...next, company];
     }
 
@@ -162,6 +236,7 @@ export async function POST(request: Request) {
     }
 
     next.splice(0, next.length, ...candidate);
+    if (validatePortals && entry.portalOk === false) problematic += 1;
     if (mode === "update") {
       updated += 1;
     } else {
@@ -199,6 +274,7 @@ export async function POST(request: Request) {
     imported,
     updated,
     skipped,
+    problematic,
     redisAvailable,
     entitlements,
   };

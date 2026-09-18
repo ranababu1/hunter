@@ -143,6 +143,9 @@ export async function POST(request: Request) {
     active: parsed.data.active ?? true,
     updatedAt: now,
   };
+  if (company.careersUrl) {
+    company.portalOk = true;
+  }
 
   const next = [...companies, company].sort((a, b) =>
     a.name.localeCompare(b.name),
@@ -210,6 +213,16 @@ export async function PUT(request: Request) {
     id: prev.id,
     updatedAt: new Date().toISOString(),
   };
+
+  // Manual save with a careersUrl clears prior portal flags (treat as ok).
+  if (
+    "careersUrl" in parsed.data &&
+    parsed.data.careersUrl !== undefined &&
+    parsed.data.careersUrl !== prev.careersUrl
+  ) {
+    updated.portalOk = true;
+    delete updated.portalIssue;
+  }
 
   const next = [...companies];
   next[idx] = updated;

@@ -25,6 +25,7 @@ type ImportSummary = {
   imported: number;
   updated: number;
   skipped: { name: string; reason: string }[];
+  problematic: number;
 };
 
 const PRIORITY_ORDER: Record<CompanyPriority, number> = {
@@ -116,6 +117,8 @@ export function CompaniesView() {
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [importSummary, setImportSummary] = useState<ImportSummary | null>(null);
+  const [validatePortals, setValidatePortals] = useState(false);
+  const [problematicOnly, setProblematicOnly] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -169,9 +172,17 @@ export function CompaniesView() {
     return () => window.removeEventListener("keydown", onKey);
   }, [modal, deleteTarget]);
 
+  const problematicCount = useMemo(
+    () => companies.filter((c) => c.portalOk === false).length,
+    [companies],
+  );
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     let rows = companies;
+    if (problematicOnly) {
+      rows = rows.filter((c) => c.portalOk === false);
+    }
     if (q) {
       rows = rows.filter(
         (c) =>
@@ -190,7 +201,7 @@ export function CompaniesView() {
       });
     }
     return sorted;
-  }, [companies, query, sortKey]);
+  }, [companies, query, sortKey, problematicOnly]);
 
   function openAdd() {
     if (
@@ -218,7 +229,45 @@ export function CompaniesView() {
     setImportText("");
     setImportError(null);
     setImportSummary(null);
+    setValidatePortals(false);
     setModal({ mode: "import" });
+  }
+
+  function onImportFile(file: File | null) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const textValue = typeof reader.result === "string" ? reader.result : "";
+      setImportText(textValue);
+      setImportError(null);
+      setImportSummary(null);
+    };
+    reader.onerror = () => {
+      setImportError("Could not read the selected file.");
+    };
+    reader.readAsText(file);
+  }
+
+  function validateImportMapping(parsed: unknown): string | null {
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return "Import JSON must be an object (not an array) mapping company names to URLs.";
+    }
+    const entries = Object.entries(parsed as Record<string, unknown>);
+    if (entries.length === 0) {
+      return "JSON object is empty — add at least one company name → URL pair.";
+    }
+    for (const [key, value] of entries) {
+      if (typeof key !== "string" || !key.trim()) {
+        return "Every company name (key) must be a non-empty string.";
+      }
+      if (typeof value !== "string" || !value.trim()) {
+        return `URL for "${key}" must be a non-empty string.`;
+      }
+      if (!/^https?:\/\//i.test(value.trim())) {
+        return `URL for "${key}" must start with http:// or https://.`;
+      }
+    }
+    return null;
   }
 
   async function submitImport(e: React.FormEvent) {
@@ -230,8 +279,9 @@ export function CompaniesView() {
       setImportError("Enter valid JSON before importing.");
       return;
     }
-    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
-      setImportError("Import JSON must be an object mapping company names to URLs.");
+    const formatError = validateImportMapping(parsed);
+    if (formatError) {
+      setImportError(formatError);
       return;
     }
 
@@ -241,7 +291,10 @@ export function CompaniesView() {
       const res = await fetch("/api/companies/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(parsed),
+        body: JSON.stringify({
+          mapping: parsed,
+          validatePortals,
+        }),
       });
       const data = (await res.json()) as {
         error?: string;
@@ -250,6 +303,7 @@ export function CompaniesView() {
         imported?: number;
         updated?: number;
         skipped?: { name: string; reason: string }[];
+        problematic?: number;
       };
       if (data.companies) setCompanies(data.companies);
       if (data.imported != null || data.updated != null || data.skipped) {
@@ -257,6 +311,7 @@ export function CompaniesView() {
           imported: data.imported ?? 0,
           updated: data.updated ?? 0,
           skipped: data.skipped ?? [],
+          problematic: data.problematic ?? 0,
         });
       }
       if (!res.ok) {
@@ -471,7 +526,21 @@ export function CompaniesView() {
             className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg-elevated)] py-2.5 pl-10 pr-3 text-sm text-[var(--text)] outline-none placeholder:text-[var(--text-dim)] focus:border-[var(--accent)]"
           />
         </div>
-        <div className="flex items-center gap-2 text-sm">
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <button
+            type="button"
+            onClick={() => setProblematicOnly((v) => !v)}
+            className={clsx(
+              "rounded-full border px-3 py-1 transition",
+              problematicOnly
+                ? "border-[rgba(210,153,34,0.55)] bg-[rgba(210,153,34,0.18)] text-[var(--good)]"
+                : "border-[var(--border)] bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:text-[var(--text)]",
+            )}
+            title="Show only companies with a flagged careers portal"
+          >
+            Problematic only
+            {problematicCount > 0 ? ` (${problematicCount})` : ""}
+          </button>
           <span className="text-[var(--text-dim)]">Sort</span>
           <div className="flex rounded-full border border-[var(--border)] bg-[var(--bg-elevated)] p-1">
             {(
@@ -518,15 +587,17 @@ export function CompaniesView() {
           </div>
           <div>
             <p className="font-medium text-[var(--text)]">
-              {query ? "No matches" : "No companies yet"}
+              {query || problematicOnly ? "No matches" : "No companies yet"}
             </p>
             <p className="mt-1 text-sm text-[var(--text-muted)]">
-              {query
-                ? "Try a different search."
-                : "Add your first target company to get started."}
+              {problematicOnly && !query
+                ? "No companies with portal issues."
+                : query
+                  ? "Try a different search."
+                  : "Add your first target company to get started."}
             </p>
           </div>
-          {!query && (
+          {!query && !problematicOnly && (
             <button
               type="button"
               onClick={openAdd}
@@ -557,20 +628,37 @@ export function CompaniesView() {
                 {filtered.map((row) => (
                   <tr
                     key={row.id}
-                    className="border-b border-[var(--border)] last:border-b-0 transition hover:bg-[rgba(45,212,191,0.04)]"
+                    className={clsx(
+                      "border-b last:border-b-0 transition",
+                      row.portalOk === false
+                        ? "border-[rgba(210,153,34,0.35)] bg-[rgba(210,153,34,0.08)] hover:bg-[rgba(210,153,34,0.14)]"
+                        : "border-[var(--border)] hover:bg-[rgba(45,212,191,0.04)]",
+                    )}
                   >
                     <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <span className="font-medium text-[var(--text)]">
                           {row.name}
                         </span>
+                        {row.portalOk === false ? (
+                          <span
+                            className="inline-flex rounded-full border border-[rgba(210,153,34,0.45)] bg-[rgba(210,153,34,0.15)] px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--good)]"
+                            title={row.portalIssue || "Portal check failed"}
+                          >
+                            Portal issue
+                          </span>
+                        ) : null}
                         {row.careersUrl ? (
                           <a
                             href={row.careersUrl}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-[var(--accent)] opacity-80 hover:opacity-100"
-                            title={row.careersUrl}
+                            title={
+                              row.portalOk === false && row.portalIssue
+                                ? `${row.portalIssue} — ${row.careersUrl}`
+                                : row.careersUrl
+                            }
                             onClick={(e) => e.stopPropagation()}
                           >
                             <ExternalLink className="h-3.5 w-3.5" />
@@ -819,6 +907,20 @@ export function CompaniesView() {
                 </div>
                 <form onSubmit={submitImport} className="space-y-4 px-5 py-5">
                   <label className="block space-y-1.5">
+                    <span className="eyebrow">Upload .json file</span>
+                    <input
+                      type="file"
+                      accept="application/json,.json"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] ?? null;
+                        onImportFile(file);
+                        e.target.value = "";
+                      }}
+                      className="block w-full text-sm text-[var(--text-muted)] file:mr-3 file:rounded-full file:border file:border-[var(--border)] file:bg-[var(--bg-elevated)] file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-[var(--text)] hover:file:border-[var(--border-strong)]"
+                    />
+                  </label>
+
+                  <label className="block space-y-1.5">
                     <span className="eyebrow">JSON mapping</span>
                     <textarea
                       value={importText}
@@ -830,6 +932,23 @@ export function CompaniesView() {
                     />
                   </label>
 
+                  <label className="flex items-start gap-2.5 rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 py-3">
+                    <input
+                      type="checkbox"
+                      checked={validatePortals}
+                      onChange={(e) => setValidatePortals(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 rounded border-[var(--border)] accent-[var(--accent)]"
+                    />
+                    <span className="text-sm">
+                      <span className="font-medium text-[var(--text)]">
+                        Validate job portal URLs
+                      </span>
+                      <span className="mt-0.5 block text-xs text-[var(--text-muted)]">
+                        Checks each link; bad ones still import but are flagged.
+                      </span>
+                    </span>
+                  </label>
+
                   {importError && (
                     <p className="text-sm text-[var(--danger)]">{importError}</p>
                   )}
@@ -837,7 +956,13 @@ export function CompaniesView() {
                   {importSummary && (
                     <div className="rounded-xl border border-[rgba(45,212,191,0.3)] bg-[var(--accent-soft)] px-4 py-3 text-sm">
                       <p className="font-medium text-[var(--text)]">
-                        Imported {importSummary.imported}, updated {importSummary.updated}, skipped {importSummary.skipped.length}.
+                        Imported {importSummary.imported}, updated{" "}
+                        {importSummary.updated}, skipped{" "}
+                        {importSummary.skipped.length}
+                        {importSummary.problematic > 0
+                          ? `, problematic ${importSummary.problematic}`
+                          : ""}
+                        .
                       </p>
                       {importSummary.skipped.length > 0 && (
                         <ul className="mt-2 space-y-1 text-xs text-[var(--text-muted)]">
@@ -864,7 +989,11 @@ export function CompaniesView() {
                       disabled={importing}
                       className="rounded-full border border-[rgba(45,212,191,0.35)] bg-[var(--accent-soft)] px-4 py-2 text-sm font-medium text-[var(--accent)] disabled:opacity-50"
                     >
-                      {importing ? "Importing…" : "Import"}
+                      {importing
+                        ? validatePortals
+                          ? "Checking & importing…"
+                          : "Importing…"
+                        : "Import"}
                     </button>
                   </div>
                 </form>
