@@ -6,6 +6,7 @@ export const GLOBAL = {
   status: "hunter:status",
   migrated: "hunter:migrated:v1",
   usersByEmail: "hunter:users:byEmail",
+  userIds: "hunter:users:ids",
 } as const;
 
 export function userKey(id: string) {
@@ -20,5 +21,7 @@ export function u(userId: string) {
     profile: `hunter:u:${userId}:profile`,
     usage: `hunter:u:${userId}:usage`,
     billing: `hunter:u:${userId}:billing`,
+    fetchRuns: `hunter:u:${userId}:fetchRuns`,
+    lastFetchDate: `hunter:u:${userId}:lastFetchDate`,
   };
 }

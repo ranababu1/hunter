@@ -11,7 +11,9 @@ export function AppMain({ children }: { children: React.ReactNode }) {
     pathname === "/fetches" ||
     pathname.startsWith("/fetches/") ||
     pathname === "/companies" ||
-    pathname.startsWith("/companies/");
+    pathname.startsWith("/companies/") ||
+    pathname === "/users" ||
+    pathname.startsWith("/users/");
 
   return (
     <main

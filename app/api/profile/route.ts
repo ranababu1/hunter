@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { requireUser, toPublicUser } from "@/lib/auth";
 import {
   checkStorageQuota,
   projectedBytesWithProfile,
   recomputeAndStoreUsage,
 } from "@/lib/redis";
-import { getProfile, saveProfile } from "@/lib/users";
+import { getProfile, saveProfile, updateUserFields } from "@/lib/users";
 import type { TargetRole, UserProfile } from "@/lib/types";
 
 const MAX_RESUME_CHARS = 200_000;
@@ -21,7 +21,14 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const profile = await getProfile(user.id);
-  return NextResponse.json({ profile });
+  return NextResponse.json({
+    profile: {
+      ...profile,
+      phone: profile.phone ?? user.phone ?? "",
+      displayName: profile.displayName || user.name,
+    },
+    user: toPublicUser(user),
+  });
 }
 
 export async function PUT(request: Request) {
@@ -95,8 +102,22 @@ export async function PUT(request: Request) {
     };
   }
 
+  let phone = prev.phone ?? user.phone ?? "";
+  if ("phone" in body) {
+    phone = asString(body.phone).trim().slice(0, 40);
+  }
+
+  // Prefer User record for name/phone so admin table sees them
+  if ("displayName" in body || "phone" in body) {
+    await updateUserFields(user.id, {
+      name: displayName || user.name,
+      phone,
+    });
+  }
+
   const profile: UserProfile = {
     displayName,
+    phone: phone || undefined,
     resumeText,
     resumeMeta,
     targetRoles,
@@ -117,5 +138,8 @@ export async function PUT(request: Request) {
     );
   }
   await recomputeAndStoreUsage(user.id);
-  return NextResponse.json({ profile });
+  return NextResponse.json({
+    profile,
+    user: toPublicUser({ ...user, name: displayName || user.name, phone: phone || undefined }),
+  });
 }

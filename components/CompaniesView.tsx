@@ -86,7 +86,7 @@ export function CompaniesView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [redisAvailable, setRedisAvailable] = useState(true);
-  const [maxCompanies, setMaxCompanies] = useState(10);
+  const [maxCompanies, setMaxCompanies] = useState(5);
   const [bytesUsed, setBytesUsed] = useState(0);
   const [maxStorageBytes, setMaxStorageBytes] = useState(2 * 1024 * 1024);
   const [limitNudge, setLimitNudge] = useState<string | null>(null);

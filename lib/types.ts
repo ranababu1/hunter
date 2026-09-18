@@ -134,6 +134,24 @@ export interface FetchesSnapshot {
   companies: CompanyFetch[];
 }
 
+export type FetchRunStatus = "ok" | "partial" | "error" | "skipped";
+
+/** Per-user fetch run (Phase 2). Morning agent will write the same shape later. */
+export interface FetchRun {
+  id: string;
+  runDate: string; // YYYY-MM-DD IST
+  createdAt: string; // ISO
+  status: FetchRunStatus;
+  cadenceApplied: FetchCadence;
+  companiesChecked: number;
+  jobsFound: number;
+  notes?: string;
+  issue?: string;
+  /** catalog | seed — Phase 2 matches against global jobs/fetches JSON (no live crawler). */
+  source?: "catalog" | "seed";
+  companyResults: CompanyFetch[];
+}
+
 export type CompanyPriority = "high" | "medium" | "low";
 
 export interface CompanyProfile {
@@ -170,6 +188,7 @@ export interface User {
   email: string;
   passwordHash: string;
   name: string;
+  phone?: string;
   role: UserRole;
   createdAt: string;
   updatedAt: string;
@@ -180,9 +199,12 @@ export interface PublicUser {
   id: string;
   email: string;
   name: string;
+  phone?: string;
   role: UserRole;
   createdAt: string;
 }
+
+export type FetchCadence = "daily" | "alternate";
 
 export interface Entitlements {
   companyPlan: CompanyPlanId;
@@ -190,6 +212,9 @@ export interface Entitlements {
   maxCompanies: number; // Infinity serialized as -1 for JSON
   maxStorageBytes: number;
   isAdmin: boolean;
+  fetchCadence: FetchCadence;
+  maxFetchHistory: number; // Infinity serialized as -1 for JSON
+  fetchEnabled: boolean;
 }
 
 export interface BillingAccount {
@@ -221,6 +246,7 @@ export interface ResumeMeta {
 
 export interface UserProfile {
   displayName: string;
+  phone?: string;
   resumeText: string;
   resumeMeta: ResumeMeta;
   targetRoles: TargetRole[];

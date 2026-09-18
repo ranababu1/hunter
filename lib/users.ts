@@ -7,6 +7,7 @@ import type {
   AppState,
   BillingAccount,
   CompanyProfile,
+  FetchRun,
   KanbanStatus,
   UsageMeter,
   User,
@@ -55,6 +56,7 @@ export async function createUser(user: User): Promise<boolean> {
     await redis.hset(GLOBAL.usersByEmail, {
       [user.email.toLowerCase()]: user.id,
     });
+    await redis.sadd(GLOBAL.userIds, user.id);
     // Ensure billing defaults
     const keys = u(user.id);
     const existingBilling = await redis.get(keys.billing);
@@ -85,9 +87,10 @@ export async function createUser(user: User): Promise<boolean> {
  * create admin account.
  */
 export async function ensureAdminBootstrap(): Promise<void> {
-  const email = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  const email =
+    process.env.ADMIN_EMAIL?.trim().toLowerCase() || "imrn.dev@gmail.com";
   const pass = process.env.ADMIN_BOOTSTRAP_PASSWORD;
-  if (!email || !pass) return;
+  if (!pass) return;
   const redis = getRedis();
   if (!redis) return;
   try {
@@ -294,4 +297,114 @@ export async function patchUserJobState(
   if (patch.visited) await markUserVisited(userId, jobId);
   if (patch.status) await setUserJobStatus(userId, jobId, patch.status);
   return getUserAppState(userId);
+}
+
+
+/** Backfill hunter:users:ids from byEmail hash if the set is empty/missing. */
+export async function ensureUserIdsIndex(): Promise<void> {
+  const redis = getRedis();
+  if (!redis) return;
+  try {
+    const existing = await redis.scard(GLOBAL.userIds);
+    if (existing && existing > 0) return;
+    const map = await redis.hgetall<Record<string, string>>(GLOBAL.usersByEmail);
+    if (!map || Object.keys(map).length === 0) return;
+    const ids = [...new Set(Object.values(map))];
+    if (ids.length === 0) return;
+    await redis.sadd(GLOBAL.userIds, ids[0], ...ids.slice(1));
+    console.info("[hunter] Backfilled hunter:users:ids with", ids.length, "users");
+  } catch (err) {
+    console.warn("[hunter] ensureUserIdsIndex failed:", err);
+  }
+}
+
+export async function listAllUsers(): Promise<User[]> {
+  const redis = getRedis();
+  if (!redis) return [];
+  try {
+    await ensureUserIdsIndex();
+    let ids = (await redis.smembers(GLOBAL.userIds)) as string[];
+    if (!ids || ids.length === 0) {
+      const map = await redis.hgetall<Record<string, string>>(GLOBAL.usersByEmail);
+      ids = map ? [...new Set(Object.values(map))] : [];
+    }
+    const users: User[] = [];
+    for (const id of ids) {
+      const u = await getUserById(id);
+      if (u) users.push(u);
+    }
+    users.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+    return users;
+  } catch (err) {
+    console.warn("[hunter] listAllUsers failed:", err);
+    return [];
+  }
+}
+
+export async function updateUserFields(
+  userId: string,
+  patch: { name?: string; phone?: string },
+): Promise<User | null> {
+  const user = await getUserById(userId);
+  if (!user) return null;
+  if (patch.name !== undefined) user.name = patch.name.trim().slice(0, 120);
+  if (patch.phone !== undefined) {
+    const p = patch.phone.trim().slice(0, 40);
+    user.phone = p || undefined;
+  }
+  user.updatedAt = new Date().toISOString();
+  const ok = await createUser(user);
+  return ok ? user : null;
+}
+
+export async function getFetchRuns(userId: string): Promise<FetchRun[]> {
+  const redis = getRedis();
+  if (!redis) return [];
+  try {
+    const raw = await redis.get<string | FetchRun[]>(u(userId).fetchRuns);
+    if (raw == null) return [];
+    const runs = typeof raw === "string" ? (JSON.parse(raw) as FetchRun[]) : raw;
+    return Array.isArray(runs) ? runs : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function saveFetchRuns(
+  userId: string,
+  runs: FetchRun[],
+): Promise<boolean> {
+  const redis = getRedis();
+  if (!redis) return false;
+  try {
+    await redis.set(u(userId).fetchRuns, JSON.stringify(runs));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function getLastFetchDate(userId: string): Promise<string | null> {
+  const redis = getRedis();
+  if (!redis) return null;
+  try {
+    const raw = await redis.get<string>(u(userId).lastFetchDate);
+    if (raw == null) return null;
+    return typeof raw === "string" ? raw : String(raw);
+  } catch {
+    return null;
+  }
+}
+
+export async function setLastFetchDate(
+  userId: string,
+  date: string,
+): Promise<void> {
+  const redis = getRedis();
+  if (!redis) return;
+  try {
+    await redis.set(u(userId).lastFetchDate, date);
+  } catch (err) {
+    console.warn("[hunter] setLastFetchDate failed:", err);
+  }
 }

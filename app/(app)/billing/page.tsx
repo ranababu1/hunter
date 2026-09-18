@@ -93,7 +93,7 @@ export default function BillingPage() {
         <div className="eyebrow mb-2">Plans</div>
         <h1 className="prose-title text-3xl sm:text-4xl">Billing</h1>
         <p className="mt-2 text-sm text-[var(--text-muted)]">
-          Payments are not configured yet (Phase 1 stubs). Display prices only.
+          Payments are not configured yet (Stripe stubs). Display prices only. Free = 5 companies · alternate-day fetches.
         </p>
       </div>
 

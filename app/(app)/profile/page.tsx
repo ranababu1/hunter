@@ -13,6 +13,7 @@ type MePayload = {
 export default function ProfilePage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [displayName, setDisplayName] = useState("");
+  const [phone, setPhone] = useState("");
   const [resumeText, setResumeText] = useState("");
   const [roles, setRoles] = useState<TargetRole[]>([]);
   const [roleInput, setRoleInput] = useState("");
@@ -29,9 +30,13 @@ export default function ProfilePage() {
         fetch("/api/me"),
       ]);
       if (pRes.ok) {
-        const data = (await pRes.json()) as { profile: UserProfile };
+        const data = (await pRes.json()) as {
+          profile: UserProfile;
+          user?: { phone?: string; name?: string };
+        };
         setProfile(data.profile);
-        setDisplayName(data.profile.displayName ?? "");
+        setDisplayName(data.profile.displayName || data.user?.name || "");
+        setPhone(data.profile.phone || data.user?.phone || "");
         setResumeText(data.profile.resumeText ?? "");
         setRoles(data.profile.targetRoles ?? []);
       }
@@ -95,6 +100,7 @@ export default function ProfilePage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           displayName,
+          phone,
           resumeText,
           targetRoles: roles,
           resumeMeta: profile?.resumeMeta?.fileName
@@ -166,6 +172,17 @@ export default function ProfilePage() {
           <input
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
+            className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
+          />
+        </label>
+
+        <label className="block space-y-1.5">
+          <span className="eyebrow">Phone</span>
+          <input
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="+91 …"
             className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
           />
         </label>

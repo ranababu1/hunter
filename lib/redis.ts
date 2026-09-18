@@ -34,12 +34,14 @@ export async function computeBytesUsed(userId: string): Promise<number> {
   if (!redis) return 0;
   const keys = u(userId);
   try {
-    const [companiesRaw, profileRaw, status, visited] = await Promise.all([
-      redis.get<string | CompanyProfile[]>(keys.companies),
-      redis.get<string | UserProfile>(keys.profile),
-      redis.hgetall<Record<string, string>>(keys.status),
-      redis.smembers(keys.visited),
-    ]);
+    const [companiesRaw, profileRaw, status, visited, fetchRunsRaw] =
+      await Promise.all([
+        redis.get<string | CompanyProfile[]>(keys.companies),
+        redis.get<string | UserProfile>(keys.profile),
+        redis.hgetall<Record<string, string>>(keys.status),
+        redis.smembers(keys.visited),
+        redis.get<string>(keys.fetchRuns),
+      ]);
     const companiesStr =
       companiesRaw == null
         ? "[]"
@@ -54,11 +56,18 @@ export async function computeBytesUsed(userId: string): Promise<number> {
           : JSON.stringify(profileRaw);
     const statusStr = JSON.stringify(status ?? {});
     const visitedStr = JSON.stringify(visited ?? []);
+    const fetchRunsStr =
+      fetchRunsRaw == null
+        ? "[]"
+        : typeof fetchRunsRaw === "string"
+          ? fetchRunsRaw
+          : JSON.stringify(fetchRunsRaw);
     return (
       utf8Bytes(companiesStr) +
       utf8Bytes(profileStr) +
       utf8Bytes(statusStr) +
-      utf8Bytes(visitedStr)
+      utf8Bytes(visitedStr) +
+      utf8Bytes(fetchRunsStr)
     );
   } catch (err) {
     console.warn("[hunter] computeBytesUsed failed:", err);
@@ -177,10 +186,11 @@ export async function projectedBytesWithCompanies(
   if (!redis) return utf8Bytes(JSON.stringify(companies));
   const keys = u(userId);
   try {
-    const [profileRaw, status, visited] = await Promise.all([
+    const [profileRaw, status, visited, fetchRunsRaw] = await Promise.all([
       redis.get<string | UserProfile>(keys.profile),
       redis.hgetall<Record<string, string>>(keys.status),
       redis.smembers(keys.visited),
+      redis.get<string>(keys.fetchRuns),
     ]);
     const profileStr =
       profileRaw == null
@@ -188,11 +198,18 @@ export async function projectedBytesWithCompanies(
         : typeof profileRaw === "string"
           ? profileRaw
           : JSON.stringify(profileRaw);
+    const fetchRunsStr =
+      fetchRunsRaw == null
+        ? "[]"
+        : typeof fetchRunsRaw === "string"
+          ? fetchRunsRaw
+          : JSON.stringify(fetchRunsRaw);
     return (
       utf8Bytes(JSON.stringify(companies)) +
       utf8Bytes(profileStr) +
       utf8Bytes(JSON.stringify(status ?? {})) +
-      utf8Bytes(JSON.stringify(visited ?? []))
+      utf8Bytes(JSON.stringify(visited ?? [])) +
+      utf8Bytes(fetchRunsStr)
     );
   } catch {
     return utf8Bytes(JSON.stringify(companies));
@@ -207,10 +224,11 @@ export async function projectedBytesWithProfile(
   if (!redis) return utf8Bytes(JSON.stringify(profile));
   const keys = u(userId);
   try {
-    const [companiesRaw, status, visited] = await Promise.all([
+    const [companiesRaw, status, visited, fetchRunsRaw] = await Promise.all([
       redis.get<string | CompanyProfile[]>(keys.companies),
       redis.hgetall<Record<string, string>>(keys.status),
       redis.smembers(keys.visited),
+      redis.get<string>(keys.fetchRuns),
     ]);
     const companiesStr =
       companiesRaw == null
@@ -218,11 +236,18 @@ export async function projectedBytesWithProfile(
         : typeof companiesRaw === "string"
           ? companiesRaw
           : JSON.stringify(companiesRaw);
+    const fetchRunsStr =
+      fetchRunsRaw == null
+        ? "[]"
+        : typeof fetchRunsRaw === "string"
+          ? fetchRunsRaw
+          : JSON.stringify(fetchRunsRaw);
     return (
       utf8Bytes(companiesStr) +
       utf8Bytes(JSON.stringify(profile)) +
       utf8Bytes(JSON.stringify(status ?? {})) +
-      utf8Bytes(JSON.stringify(visited ?? []))
+      utf8Bytes(JSON.stringify(visited ?? [])) +
+      utf8Bytes(fetchRunsStr)
     );
   } catch {
     return utf8Bytes(JSON.stringify(profile));

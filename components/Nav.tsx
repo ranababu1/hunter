@@ -14,9 +14,10 @@ import {
   LogOut,
   User,
   CreditCard,
+  Users,
 } from "lucide-react";
 
-const links = [
+const baseLinks = [
   { href: "/", label: "Daily", icon: Newspaper },
   { href: "/board", label: "Board", icon: LayoutGrid },
   { href: "/kanban", label: "Kanban", icon: Columns3 },
@@ -25,11 +26,13 @@ const links = [
 ];
 
 type MeUser = { email: string; name: string; role: string };
+type MeEntitlements = { isAdmin?: boolean };
 
 export function Nav() {
   const pathname = usePathname();
   const router = useRouter();
   const [user, setUser] = useState<MeUser | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -37,8 +40,12 @@ export function Nav() {
       try {
         const res = await fetch("/api/me");
         if (!res.ok) return;
-        const data = (await res.json()) as { user?: MeUser };
+        const data = (await res.json()) as {
+          user?: MeUser;
+          entitlements?: MeEntitlements;
+        };
         if (!cancelled && data.user) setUser(data.user);
+        if (!cancelled) setIsAdmin(Boolean(data.entitlements?.isAdmin));
       } catch {
         // ignore
       }
@@ -47,6 +54,13 @@ export function Nav() {
       cancelled = true;
     };
   }, []);
+
+  const links = isAdmin
+    ? [
+        ...baseLinks,
+        { href: "/users", label: "Users", icon: Users },
+      ]
+    : baseLinks;
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST" });

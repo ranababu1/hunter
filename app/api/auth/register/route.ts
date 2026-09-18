@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { registerUser, setSessionCookies, toPublicUser } from "@/lib/auth";
 
 export async function POST(request: Request) {
-  let body: { email?: string; password?: string; name?: string } = {};
+  let body: { email?: string; password?: string; name?: string; phone?: string } = {};
   try {
     body = await request.json();
   } catch {
@@ -13,6 +13,7 @@ export async function POST(request: Request) {
     email: body.email ?? "",
     password: body.password ?? "",
     name: body.name,
+    phone: body.phone,
   });
 
   if ("error" in result) {

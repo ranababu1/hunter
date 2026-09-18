@@ -3,13 +3,14 @@
 import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Lock, Mail, User, ArrowRight, Crosshair } from "lucide-react";
+import { Lock, Mail, User, Phone, ArrowRight, Crosshair } from "lucide-react";
 
 export default function RegisterPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -25,6 +26,7 @@ export default function RegisterPage() {
           email: email.trim(),
           password,
           name: name.trim() || undefined,
+          phone: phone.trim() || undefined,
         }),
       });
       const data = (await res.json()) as { error?: string };
@@ -64,7 +66,7 @@ export default function RegisterPage() {
           Register
         </h1>
         <p className="mb-8 text-sm leading-relaxed text-[var(--text-muted)]">
-          Free plan: 10 companies · 2 MB storage. Upgrade anytime from Billing.
+          Free plan: 5 companies · 2 MB · alternate-day fetches. Upgrade anytime from Billing.
         </p>
 
         <label className="mb-2 block text-xs font-medium tracking-wide text-[var(--text-dim)]">
@@ -93,6 +95,22 @@ export default function RegisterPage() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@example.com"
+            className="w-full rounded-xl border border-[var(--border-strong)] bg-[var(--bg)] py-3 pl-10 pr-4 text-[var(--text)] outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
+          />
+        </div>
+
+
+        <label className="mb-2 block text-xs font-medium tracking-wide text-[var(--text-dim)]">
+          PHONE (OPTIONAL)
+        </label>
+        <div className="relative mb-4">
+          <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-dim)]" />
+          <input
+            type="tel"
+            autoComplete="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="+91 …"
             className="w-full rounded-xl border border-[var(--border-strong)] bg-[var(--bg)] py-3 pl-10 pr-4 text-[var(--text)] outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
           />
         </div>

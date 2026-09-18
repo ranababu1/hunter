@@ -4,7 +4,7 @@ Private multi-user job-tracking HQ for Bengaluru AI / GenAI roles. Dark editoria
 
 **Repo:** [github.com/ranababu1/hunter](https://github.com/ranababu1/hunter)
 
-**Admin:** `imrn.dev@gmail.com` (unlimited companies · 10 MB storage)
+**Admin:** `imrn.dev@gmail.com` (unlimited companies · 10 MB · daily fetches; auto-promoted on `/api/me`)
 
 See [ARCHITECTURE-MULTIUSER.md](./ARCHITECTURE-MULTIUSER.md) for tenancy, plans, and Stripe plug-in points.
 
@@ -43,16 +43,16 @@ Without `AUTH_SECRET` / `SITE_PASSWORD`, middleware allows all routes in develop
 
 Without Redis, visited/status/companies mutations return 503; APIs no-op gracefully where noted.
 
-## Plans (Phase 1 — no real payments)
+## Plans (Phase 2 — Stripe still stubbed)
 
-| Plan | Companies | Storage | Price (display) |
-|---|---|---|---|
-| Free | 10 | 2 MB | $0 |
-| Companies 20 / 45 / 100 | 20 / 45 / 100 | — | $5 / $10 / $20 |
-| Storage Plus | — | 10 MB | $10 |
-| Admin (`ADMIN_EMAIL`) | Unlimited | 10 MB | — |
+| Plan | Companies | Storage | Fetches | Price (display) |
+|---|---|---|---|---|
+| Free | 5 | 2 MB | Alternate-day · 30 history | $0 |
+| Companies 20 / 45 / 100 | 20 / 45 / 100 | — | Daily · unlimited history | $5 / $10 / $20 |
+| Storage Plus | — | 10 MB | (no cadence change) | $10 |
+| Admin (`ADMIN_EMAIL` or `imrn.dev@gmail.com`) | Unlimited | 10 MB | Daily · unlimited | — |
 
-Billing UI + `/api/billing/checkout|webhook` are **501 stubs** until Stripe is wired (Phase 2).
+Billing UI + `/api/billing/checkout|webhook` remain **501 stubs** (Stripe not integrated).
 
 ## Daily JSON update flow
 

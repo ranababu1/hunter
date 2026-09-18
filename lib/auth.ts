@@ -11,6 +11,7 @@ import {
   maybeMigrateGlobalData,
   getBilling,
   getUsage,
+  setBilling,
 } from "./users";
 import {
   adminBilling,
@@ -35,10 +36,36 @@ export function isAuthConfigured(): boolean {
   return Boolean(getAuthSecret() || process.env.ADMIN_EMAIL);
 }
 
+const HARDCODED_ADMIN_EMAIL = "imrn.dev@gmail.com";
+
+/** True if email matches ADMIN_EMAIL env or hardcoded fallback (case-insensitive). */
 export function isAdminEmail(email: string): boolean {
-  const admin = process.env.ADMIN_EMAIL?.trim().toLowerCase();
-  if (!admin) return false;
-  return email.trim().toLowerCase() === admin;
+  const normalized = email.trim().toLowerCase();
+  const fromEnv = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  const admin = fromEnv || HARDCODED_ADMIN_EMAIL;
+  return normalized === admin || normalized === HARDCODED_ADMIN_EMAIL;
+}
+
+/**
+ * If user email is admin, promote role, upsert, set adminBilling, run migration.
+ * Safe to call on every /api/me and authenticated API path.
+ */
+export async function ensureAdminPrivileges(user: User): Promise<User> {
+  if (!isAdminEmail(user.email)) return user;
+  let changed = false;
+  if (user.role !== "admin") {
+    user.role = "admin";
+    user.updatedAt = new Date().toISOString();
+    changed = true;
+  }
+  if (changed) {
+    await createUser(user); // upsert
+  } else {
+    // Still ensure billing + migration even if already admin
+  }
+  await setBilling(user.id, adminBilling());
+  await maybeMigrateGlobalData(user.id);
+  return user;
 }
 
 /** HMAC-SHA256 hex of message with auth secret (Node). */
@@ -112,6 +139,7 @@ export function toPublicUser(u: User): PublicUser {
     id: u.id,
     email: u.email,
     name: u.name,
+    phone: u.phone,
     role: u.role,
     createdAt: u.createdAt,
   };
@@ -168,13 +196,13 @@ export async function getSessionUserId(): Promise<string | null> {
 export async function requireUser(): Promise<User | null> {
   const uid = await getSessionUserId();
   if (!uid) return null;
-  return getUserById(uid);
+  const user = await getUserById(uid);
+  if (!user) return null;
+  return ensureAdminPrivileges(user);
 }
 
 export async function getMePayload(user: User) {
-  if (user.role === "admin") {
-    await maybeMigrateGlobalData(user.id);
-  }
+  user = await ensureAdminPrivileges(user);
   const billing = (await getBilling(user.id)) ?? (
     user.role === "admin" ? adminBilling() : null
   );
@@ -199,6 +227,7 @@ export async function registerUser(input: {
   email: string;
   password: string;
   name?: string;
+  phone?: string;
 }): Promise<{ user: User } | { error: string; status: number }> {
   const email = input.email.trim().toLowerCase();
   if (!email || !email.includes("@")) {
@@ -216,11 +245,13 @@ export async function registerUser(input: {
 
   const role = isAdminEmail(email) ? "admin" : "user";
   const now = new Date().toISOString();
+  const phone = (input.phone ?? "").trim().slice(0, 40) || undefined;
   const user: User = {
     id: newUserId(),
     email,
     passwordHash: await hashPassword(input.password),
     name: (input.name ?? "").trim() || email.split("@")[0],
+    phone,
     role,
     createdAt: now,
     updatedAt: now,
@@ -232,7 +263,8 @@ export async function registerUser(input: {
       status: 503,
     };
   }
-  return { user };
+  const promoted = await ensureAdminPrivileges(user);
+  return { user: promoted };
 }
 
 export async function loginWithEmailPassword(
@@ -248,13 +280,8 @@ export async function loginWithEmailPassword(
   if (!ok) {
     return { error: "Invalid email or password", status: 401 };
   }
-  // Promote to admin if ADMIN_EMAIL matches (env changed)
-  if (isAdminEmail(user.email) && user.role !== "admin") {
-    user.role = "admin";
-    user.updatedAt = new Date().toISOString();
-    await createUser(user); // upsert
-  }
-  return { user };
+  const promoted = await ensureAdminPrivileges(user);
+  return { user: promoted };
 }
 
 /**
@@ -277,7 +304,8 @@ export async function loginWithSitePassword(
     return { error: "Invalid password", status: 401 };
   }
 
-  const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase();
+  const adminEmail =
+    process.env.ADMIN_EMAIL?.trim().toLowerCase() || HARDCODED_ADMIN_EMAIL;
   if (!adminEmail) {
     return {
       error: "ADMIN_EMAIL required for SITE_PASSWORD login",
@@ -305,7 +333,8 @@ export async function loginWithSitePassword(
       return { error: "Redis required to create admin user", status: 503 };
     }
   }
-  return { user };
+  const promoted = await ensureAdminPrivileges(user);
+  return { user: promoted };
 }
 
 /** Request helper: parse uid+session from NextRequest cookies. */
