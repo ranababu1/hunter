@@ -1,11 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Building2,
+  ChevronDown,
   ExternalLink,
   Pencil,
   Plus,
+  RefreshCw,
   Search,
   Upload,
   Trash2,
@@ -18,6 +20,7 @@ import { COMPANY_PRIORITIES } from "@/lib/types";
 import Link from "next/link";
 import { QuotaBanner } from "@/components/QuotaBanner";
 import { useMe } from "@/components/MeProvider";
+import { canonicalizeImportMapping } from "@/lib/import-hash";
 
 type SortKey = "name" | "priority";
 
@@ -27,6 +30,21 @@ type ImportSummary = {
   skipped: { name: string; reason: string }[];
   problematic: number;
 };
+
+async function sha256Hex(textValue: string): Promise<string> {
+  const data = new TextEncoder().encode(textValue);
+  const buf = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(buf))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+async function hashImportMappingClient(
+  mapping: Record<string, unknown>,
+): Promise<string> {
+  return sha256Hex(canonicalizeImportMapping(mapping));
+}
+
 
 const PRIORITY_ORDER: Record<CompanyPriority, number> = {
   high: 0,
@@ -90,6 +108,142 @@ function PriorityBadge({ priority }: { priority: CompanyPriority }) {
   );
 }
 
+function CompanyTable({
+  rows,
+  showIssue = false,
+  onEdit,
+  onDelete,
+}: {
+  rows: CompanyProfile[];
+  showIssue?: boolean;
+  onEdit: (company: CompanyProfile) => void;
+  onDelete: (company: CompanyProfile) => void;
+}) {
+  return (
+    <div className="glass overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[960px] border-collapse text-left text-sm">
+          <thead>
+            <tr className="border-b border-[var(--border)] text-[0.7rem] uppercase tracking-[0.12em] text-[var(--text-dim)]">
+              <th className="px-4 py-3 font-semibold">Name</th>
+              {showIssue ? (
+                <th className="px-4 py-3 font-semibold">Issue</th>
+              ) : null}
+              <th className="px-4 py-3 font-semibold">Valuation</th>
+              <th className="px-4 py-3 font-semibold">Headcount</th>
+              <th className="px-4 py-3 font-semibold">BLR area</th>
+              <th className="px-4 py-3 font-semibold">Industry</th>
+              <th className="px-4 py-3 font-semibold">Priority</th>
+              <th className="px-4 py-3 font-semibold">Active</th>
+              <th className="px-4 py-3 font-semibold"> </th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr
+                key={row.id}
+                className={clsx(
+                  "border-b last:border-b-0 transition",
+                  showIssue
+                    ? "border-[rgba(210,153,34,0.35)] bg-[rgba(210,153,34,0.08)] hover:bg-[rgba(210,153,34,0.14)]"
+                    : "border-[var(--border)] hover:bg-[rgba(45,212,191,0.04)]",
+                )}
+              >
+                <td className="px-4 py-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium text-[var(--text)]">
+                      {row.name}
+                    </span>
+                    {showIssue ? (
+                      <span
+                        className="inline-flex rounded-full border border-[rgba(210,153,34,0.45)] bg-[rgba(210,153,34,0.15)] px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--good)]"
+                        title={row.portalIssue || "Portal check failed"}
+                      >
+                        Portal issue
+                      </span>
+                    ) : null}
+                    {row.careersUrl ? (
+                      <a
+                        href={row.careersUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[var(--accent)] opacity-80 hover:opacity-100"
+                        title={
+                          showIssue && row.portalIssue
+                            ? `${row.portalIssue} — ${row.careersUrl}`
+                            : row.careersUrl
+                        }
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </a>
+                    ) : null}
+                  </div>
+                </td>
+                {showIssue ? (
+                  <td className="max-w-[260px] px-4 py-3 text-[var(--good)]">
+                    <span className="line-clamp-2">
+                      {row.portalIssue || "Portal check failed"}
+                    </span>
+                  </td>
+                ) : null}
+                <td className="max-w-[140px] px-4 py-3 text-[var(--text-muted)]">
+                  <span className="line-clamp-2">{row.valuation || "—"}</span>
+                </td>
+                <td className="px-4 py-3 tabular-nums text-[var(--text-muted)]">
+                  {row.headcount || "—"}
+                </td>
+                <td className="max-w-[160px] px-4 py-3 text-[var(--text-muted)]">
+                  <span className="line-clamp-2">
+                    {row.bangaloreArea || "—"}
+                  </span>
+                </td>
+                <td className="max-w-[140px] px-4 py-3 text-[var(--text-muted)]">
+                  <span className="line-clamp-2">{row.industry || "—"}</span>
+                </td>
+                <td className="px-4 py-3">
+                  <PriorityBadge priority={row.priority} />
+                </td>
+                <td className="px-4 py-3">
+                  <span
+                    className={clsx(
+                      "inline-block h-2.5 w-2.5 rounded-full",
+                      row.active
+                        ? "bg-[var(--strong)] shadow-[0_0_8px_rgba(63,185,80,0.5)]"
+                        : "bg-[var(--text-dim)]",
+                    )}
+                    title={row.active ? "Active" : "Inactive"}
+                  />
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center justify-end gap-1">
+                    <button
+                      type="button"
+                      onClick={() => onEdit(row)}
+                      className="rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-muted)] transition hover:border-[var(--border-strong)] hover:text-[var(--text)]"
+                      title="Edit"
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onDelete(row)}
+                      className="rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-muted)] transition hover:border-[rgba(248,81,73,0.45)] hover:text-[var(--danger)]"
+                      title="Delete"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export function CompaniesView() {
   const { me, refreshMe } = useMe();
   const [companies, setCompanies] = useState<CompanyProfile[]>([]);
@@ -118,7 +272,11 @@ export function CompaniesView() {
   const [importError, setImportError] = useState<string | null>(null);
   const [importSummary, setImportSummary] = useState<ImportSummary | null>(null);
   const [validatePortals, setValidatePortals] = useState(false);
-  const [problematicOnly, setProblematicOnly] = useState(false);
+  const [issuesOpen, setIssuesOpen] = useState(true);
+  const [lastImportedHash, setLastImportedHash] = useState<string | null>(null);
+  const [enriching, setEnriching] = useState(false);
+  const [enrichMessage, setEnrichMessage] = useState<string | null>(null);
+  const importFileRef = useRef<HTMLInputElement>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -172,17 +330,9 @@ export function CompaniesView() {
     return () => window.removeEventListener("keydown", onKey);
   }, [modal, deleteTarget]);
 
-  const problematicCount = useMemo(
-    () => companies.filter((c) => c.portalOk === false).length,
-    [companies],
-  );
-
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     let rows = companies;
-    if (problematicOnly) {
-      rows = rows.filter((c) => c.portalOk === false);
-    }
     if (q) {
       rows = rows.filter(
         (c) =>
@@ -201,7 +351,16 @@ export function CompaniesView() {
       });
     }
     return sorted;
-  }, [companies, query, sortKey, problematicOnly]);
+  }, [companies, query, sortKey]);
+
+  const okRows = useMemo(
+    () => filtered.filter((company) => company.portalOk !== false),
+    [filtered],
+  );
+  const issueRows = useMemo(
+    () => filtered.filter((company) => company.portalOk === false),
+    [filtered],
+  );
 
   function openAdd() {
     if (
@@ -270,6 +429,38 @@ export function CompaniesView() {
     return null;
   }
 
+  async function runEnrich(companyIds?: string[]) {
+    setEnriching(true);
+    setEnrichMessage(null);
+    try {
+      const res = await fetch("/api/companies/enrich", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(companyIds ? { companyIds } : {}),
+      });
+      const data = (await res.json()) as {
+        error?: string;
+        companies?: CompanyProfile[];
+        updated?: number;
+        unchanged?: number;
+      };
+      if (!res.ok) {
+        setEnrichMessage(data.error ?? "Enrichment failed");
+        return;
+      }
+      if (data.companies) setCompanies(data.companies);
+      const n = data.updated ?? 0;
+      setEnrichMessage(
+        n > 0 ? `Updated ${n} companies` : "No metadata changes",
+      );
+      await refreshMe();
+    } catch {
+      setEnrichMessage("Network error — could not enrich companies.");
+    } finally {
+      setEnriching(false);
+    }
+  }
+
   async function submitImport(e: React.FormEvent) {
     e.preventDefault();
     let parsed: unknown;
@@ -285,6 +476,20 @@ export function CompaniesView() {
       return;
     }
 
+    const mapping = parsed as Record<string, unknown>;
+    let clientHash: string | null = null;
+    try {
+      clientHash = await hashImportMappingClient(mapping);
+    } catch {
+      // Web Crypto unavailable — server still enforces duplicates
+    }
+    if (clientHash && lastImportedHash && clientHash === lastImportedHash) {
+      setImportError(
+        "This company list was already imported. Edit the JSON or choose a different file.",
+      );
+      return;
+    }
+
     setImporting(true);
     setImportError(null);
     try {
@@ -292,7 +497,7 @@ export function CompaniesView() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          mapping: parsed,
+          mapping,
           validatePortals,
         }),
       });
@@ -304,7 +509,17 @@ export function CompaniesView() {
         updated?: number;
         skipped?: { name: string; reason: string }[];
         problematic?: number;
+        importHash?: string;
       };
+      if (data.error === "DUPLICATE_IMPORT" || res.status === 409) {
+        setImportError(
+          data.message ??
+            "This company list was already imported.",
+        );
+        if (data.importHash) setLastImportedHash(data.importHash);
+        else if (clientHash) setLastImportedHash(clientHash);
+        return;
+      }
       if (data.companies) setCompanies(data.companies);
       if (data.imported != null || data.updated != null || data.skipped) {
         setImportSummary({
@@ -318,7 +533,24 @@ export function CompaniesView() {
         setImportError(data.message ?? data.error ?? "Import failed");
         return;
       }
+      const hash = data.importHash ?? clientHash;
+      if (hash) setLastImportedHash(hash);
+      if (importFileRef.current) importFileRef.current.value = "";
       await refreshMe();
+
+      // Enrich newly imported/updated companies (match by name from mapping)
+      const names = new Set(
+        Object.keys(mapping)
+          .map((n) => n.trim().toLowerCase())
+          .filter(Boolean),
+      );
+      const list = data.companies ?? [];
+      const ids = list
+        .filter((c) => names.has(c.name.trim().toLowerCase()))
+        .map((c) => c.id);
+      if (ids.length > 0) {
+        void runEnrich(ids);
+      }
     } catch {
       setImportError("Network error — could not import companies.");
     } finally {
@@ -459,7 +691,17 @@ export function CompaniesView() {
             {Number.isFinite(maxCompanies) ? ` / ${maxCompanies}` : " / ∞"}{" "}
             companies
           </span>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => void runEnrich()}
+              disabled={enriching || companies.length === 0}
+              className="inline-flex items-center justify-center gap-2 rounded-full border border-[var(--border)] bg-[var(--bg-elevated)] px-4 py-2 text-sm font-medium text-[var(--text-muted)] transition hover:border-[var(--border-strong)] hover:text-[var(--text)] disabled:cursor-not-allowed disabled:opacity-40"
+              title="Fill empty metadata from the built-in company seed"
+            >
+              <RefreshCw className={clsx("h-4 w-4", enriching && "animate-spin")} />
+              {enriching ? "Rechecking…" : "Recheck company metadata"}
+            </button>
             <button
               type="button"
               onClick={openImport}
@@ -515,6 +757,12 @@ export function CompaniesView() {
         </div>
       )}
 
+      {enrichMessage && (
+        <div className="glass rounded-xl border border-[rgba(45,212,191,0.35)] px-4 py-3 text-sm text-[var(--accent)]">
+          {enrichMessage}
+        </div>
+      )}
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative max-w-md flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-dim)]" />
@@ -527,20 +775,6 @@ export function CompaniesView() {
           />
         </div>
         <div className="flex flex-wrap items-center gap-2 text-sm">
-          <button
-            type="button"
-            onClick={() => setProblematicOnly((v) => !v)}
-            className={clsx(
-              "rounded-full border px-3 py-1 transition",
-              problematicOnly
-                ? "border-[rgba(210,153,34,0.55)] bg-[rgba(210,153,34,0.18)] text-[var(--good)]"
-                : "border-[var(--border)] bg-[var(--bg-elevated)] text-[var(--text-muted)] hover:text-[var(--text)]",
-            )}
-            title="Show only companies with a flagged careers portal"
-          >
-            Problematic only
-            {problematicCount > 0 ? ` (${problematicCount})` : ""}
-          </button>
           <span className="text-[var(--text-dim)]">Sort</span>
           <div className="flex rounded-full border border-[var(--border)] bg-[var(--bg-elevated)] p-1">
             {(
@@ -565,7 +799,7 @@ export function CompaniesView() {
             ))}
           </div>
           <span className="tabular-nums text-[var(--text-dim)]">
-            {filtered.length}
+            {okRows.length} ok · {issueRows.length} issues
           </span>
         </div>
       </div>
@@ -573,6 +807,38 @@ export function CompaniesView() {
       {loading ? (
         <div className="glass px-6 py-16 text-center text-sm text-[var(--text-muted)]">
           Loading companies…
+        </div>
+      ) : companies.length === 0 ? (
+        <div className="glass flex flex-col items-center gap-4 px-6 py-16 text-center">
+          <div
+            className="flex h-12 w-12 items-center justify-center rounded-xl"
+            style={{
+              background: "var(--accent-soft)",
+              border: "1px solid rgba(45,212,191,0.35)",
+            }}
+          >
+            <Building2 className="h-5 w-5 text-[var(--accent)]" />
+          </div>
+          <div>
+            <p className="font-medium text-[var(--text)]">
+              {query ? "No matches" : "No companies yet"}
+            </p>
+            <p className="mt-1 text-sm text-[var(--text-muted)]">
+              {query
+                ? "Try a different search."
+                : "Add your first target company to get started."}
+            </p>
+          </div>
+          {!query && (
+            <button
+              type="button"
+              onClick={openAdd}
+              className="inline-flex items-center gap-2 rounded-full border border-[rgba(45,212,191,0.35)] bg-[var(--accent-soft)] px-4 py-2 text-sm font-medium text-[var(--accent)]"
+            >
+              <Plus className="h-4 w-4" />
+              Add company
+            </button>
+          )}
         </div>
       ) : filtered.length === 0 ? (
         <div className="glass flex flex-col items-center gap-4 px-6 py-16 text-center">
@@ -586,144 +852,63 @@ export function CompaniesView() {
             <Building2 className="h-5 w-5 text-[var(--accent)]" />
           </div>
           <div>
-            <p className="font-medium text-[var(--text)]">
-              {query || problematicOnly ? "No matches" : "No companies yet"}
-            </p>
+            <p className="font-medium text-[var(--text)]">No matches</p>
             <p className="mt-1 text-sm text-[var(--text-muted)]">
-              {problematicOnly && !query
-                ? "No companies with portal issues."
-                : query
-                  ? "Try a different search."
-                  : "Add your first target company to get started."}
+              Try a different search.
             </p>
           </div>
-          {!query && !problematicOnly && (
-            <button
-              type="button"
-              onClick={openAdd}
-              className="inline-flex items-center gap-2 rounded-full border border-[rgba(45,212,191,0.35)] bg-[var(--accent-soft)] px-4 py-2 text-sm font-medium text-[var(--accent)]"
-            >
-              <Plus className="h-4 w-4" />
-              Add company
-            </button>
-          )}
         </div>
       ) : (
-        <div className="glass overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[960px] border-collapse text-left text-sm">
-              <thead>
-                <tr className="border-b border-[var(--border)] text-[0.7rem] uppercase tracking-[0.12em] text-[var(--text-dim)]">
-                  <th className="px-4 py-3 font-semibold">Name</th>
-                  <th className="px-4 py-3 font-semibold">Valuation</th>
-                  <th className="px-4 py-3 font-semibold">Headcount</th>
-                  <th className="px-4 py-3 font-semibold">BLR area</th>
-                  <th className="px-4 py-3 font-semibold">Industry</th>
-                  <th className="px-4 py-3 font-semibold">Priority</th>
-                  <th className="px-4 py-3 font-semibold">Active</th>
-                  <th className="px-4 py-3 font-semibold"> </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((row) => (
-                  <tr
-                    key={row.id}
-                    className={clsx(
-                      "border-b last:border-b-0 transition",
-                      row.portalOk === false
-                        ? "border-[rgba(210,153,34,0.35)] bg-[rgba(210,153,34,0.08)] hover:bg-[rgba(210,153,34,0.14)]"
-                        : "border-[var(--border)] hover:bg-[rgba(45,212,191,0.04)]",
-                    )}
-                  >
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="font-medium text-[var(--text)]">
-                          {row.name}
-                        </span>
-                        {row.portalOk === false ? (
-                          <span
-                            className="inline-flex rounded-full border border-[rgba(210,153,34,0.45)] bg-[rgba(210,153,34,0.15)] px-2 py-0.5 text-[0.65rem] font-semibold uppercase tracking-wide text-[var(--good)]"
-                            title={row.portalIssue || "Portal check failed"}
-                          >
-                            Portal issue
-                          </span>
-                        ) : null}
-                        {row.careersUrl ? (
-                          <a
-                            href={row.careersUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[var(--accent)] opacity-80 hover:opacity-100"
-                            title={
-                              row.portalOk === false && row.portalIssue
-                                ? `${row.portalIssue} — ${row.careersUrl}`
-                                : row.careersUrl
-                            }
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <ExternalLink className="h-3.5 w-3.5" />
-                          </a>
-                        ) : null}
-                      </div>
-                    </td>
-                    <td className="max-w-[140px] px-4 py-3 text-[var(--text-muted)]">
-                      <span className="line-clamp-2">
-                        {row.valuation || "—"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 tabular-nums text-[var(--text-muted)]">
-                      {row.headcount || "—"}
-                    </td>
-                    <td className="max-w-[160px] px-4 py-3 text-[var(--text-muted)]">
-                      <span className="line-clamp-2">
-                        {row.bangaloreArea || "—"}
-                      </span>
-                    </td>
-                    <td className="max-w-[140px] px-4 py-3 text-[var(--text-muted)]">
-                      <span className="line-clamp-2">
-                        {row.industry || "—"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <PriorityBadge priority={row.priority} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={clsx(
-                          "inline-block h-2.5 w-2.5 rounded-full",
-                          row.active
-                            ? "bg-[var(--strong)] shadow-[0_0_8px_rgba(63,185,80,0.5)]"
-                            : "bg-[var(--text-dim)]",
-                        )}
-                        title={row.active ? "Active" : "Inactive"}
-                      />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          type="button"
-                          onClick={() => openEdit(row)}
-                          className="rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-muted)] transition hover:border-[var(--border-strong)] hover:text-[var(--text)]"
-                          title="Edit"
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setDeleteTarget(row)}
-                          className="rounded-lg border border-[var(--border)] p-1.5 text-[var(--text-muted)] transition hover:border-[rgba(248,81,73,0.45)] hover:text-[var(--danger)]"
-                          title="Delete"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <>
+          {okRows.length === 0 ? (
+            <p className="text-sm text-[var(--text-muted)]">No healthy portals.</p>
+          ) : (
+            <CompanyTable
+              rows={okRows}
+              onEdit={openEdit}
+              onDelete={setDeleteTarget}
+            />
+          )}
+
+          {issueRows.length > 0 ? (
+            <section>
+              <button
+                type="button"
+                onClick={() => setIssuesOpen((open) => !open)}
+                className="glass mt-3 flex w-full items-center justify-between gap-3 rounded-[var(--radius)] px-4 py-3 text-left transition hover:border-[var(--border-strong)]"
+                aria-expanded={issuesOpen}
+              >
+                <div>
+                  <div className="text-sm font-semibold text-[var(--text)]">
+                    Issues
+                    <span className="ml-2 font-normal tabular-nums text-[var(--text-dim)]">
+                      ({issueRows.length})
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-xs text-[var(--text-muted)]">
+                    Portal check failures — still imported, fix careers URL when you can
+                  </p>
+                </div>
+                <ChevronDown
+                  className={clsx(
+                    "h-4 w-4 shrink-0 text-[var(--text-muted)] transition-transform",
+                    issuesOpen && "rotate-180",
+                  )}
+                />
+              </button>
+              {issuesOpen ? (
+                <div className="mt-3">
+                  <CompanyTable
+                    rows={issueRows}
+                    showIssue
+                    onEdit={openEdit}
+                    onDelete={setDeleteTarget}
+                  />
+                </div>
+              ) : null}
+            </section>
+          ) : null}
+        </>
       )}
 
       <AnimatePresence>
@@ -909,12 +1094,14 @@ export function CompaniesView() {
                   <label className="block space-y-1.5">
                     <span className="eyebrow">Upload .json file</span>
                     <input
+                      ref={importFileRef}
                       type="file"
                       accept="application/json,.json"
                       onChange={(e) => {
                         const file = e.target.files?.[0] ?? null;
                         onImportFile(file);
-                        e.target.value = "";
+                        // Keep selection so we can clear the input after success;
+                        // allow re-pick of same path by clearing only after import.
                       }}
                       className="block w-full text-sm text-[var(--text-muted)] file:mr-3 file:rounded-full file:border file:border-[var(--border)] file:bg-[var(--bg-elevated)] file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-[var(--text)] hover:file:border-[var(--border-strong)]"
                     />
@@ -924,7 +1111,10 @@ export function CompaniesView() {
                     <span className="eyebrow">JSON mapping</span>
                     <textarea
                       value={importText}
-                      onChange={(e) => setImportText(e.target.value)}
+                      onChange={(e) => {
+                        setImportText(e.target.value);
+                        setImportError(null);
+                      }}
                       rows={10}
                       spellCheck={false}
                       placeholder={'{\n  "NVIDIA": "https://nvidia.wd5.myworkdayjobs.com/...",\n  "Google": "https://www.google.com/about/careers/"\n}'}
@@ -986,7 +1176,7 @@ export function CompaniesView() {
                     </button>
                     <button
                       type="submit"
-                      disabled={importing}
+                      disabled={importing || !importText.trim()}
                       className="rounded-full border border-[rgba(45,212,191,0.35)] bg-[var(--accent-soft)] px-4 py-2 text-sm font-medium text-[var(--accent)] disabled:opacity-50"
                     >
                       {importing

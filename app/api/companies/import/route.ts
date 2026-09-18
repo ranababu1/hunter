@@ -1,11 +1,15 @@
 import { NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth";
 import {
+  appendImportHash,
   checkStorageQuota,
   getCompanies,
+  getImportHashes,
   projectedBytesWithCompanies,
   saveCompanies,
 } from "@/lib/redis";
+import { createHash } from "crypto";
+import { canonicalizeImportMapping } from "@/lib/import-hash";
 import { getBilling } from "@/lib/users";
 import { entitlementsForJson, resolveEntitlements } from "@/lib/plans";
 import {
@@ -31,6 +35,13 @@ type ImportResult = {
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
+
+function hashImportMapping(mapping: Record<string, unknown>): string {
+  return createHash("sha256")
+    .update(canonicalizeImportMapping(mapping))
+    .digest("hex");
+}
+
 
 function withQuota(
   result: ImportResult,
@@ -83,6 +94,18 @@ export async function POST(request: Request) {
     // Raw mapping object — validatePortals defaults false
     mapping = body;
     validatePortals = false;
+  }
+
+  const importHash = hashImportMapping(mapping);
+  const recentHashes = await getImportHashes(user.id);
+  if (recentHashes.includes(importHash)) {
+    return NextResponse.json(
+      {
+        error: "DUPLICATE_IMPORT",
+        message: "This company list was already imported.",
+      },
+      { status: 409 },
+    );
   }
 
   const { companies, redisAvailable } = await getCompanies(user.id);
@@ -288,10 +311,17 @@ export async function POST(request: Request) {
         { status: 503 },
       );
     }
+    await appendImportHash(user.id, importHash);
+  } else if (parsedEntries.length > 0) {
+    // Valid mapping processed with no row changes (e.g. identical URLs) — still mark seen
+    await appendImportHash(user.id, importHash);
   }
 
   if (limit) {
-    return NextResponse.json(withQuota(result, limit), { status: 402 });
+    return NextResponse.json(
+      { ...withQuota(result, limit), importHash },
+      { status: 402 },
+    );
   }
-  return NextResponse.json(result);
+  return NextResponse.json({ ...result, importHash });
 }

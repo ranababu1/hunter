@@ -23,5 +23,6 @@ export function u(userId: string) {
     billing: `hunter:u:${userId}:billing`,
     fetchRuns: `hunter:u:${userId}:fetchRuns`,
     lastFetchDate: `hunter:u:${userId}:lastFetchDate`,
+    importHashes: `hunter:u:${userId}:importHashes`,
   };
 }

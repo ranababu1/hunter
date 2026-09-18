@@ -170,6 +170,8 @@ export interface CompanyProfile {
   portalOk?: boolean;
   /** short reason when portalOk===false */
   portalIssue?: string;
+  /** ISO timestamp set when enrich fills any metadata field */
+  metadataCheckedAt?: string;
 }
 
 export const COMPANY_PRIORITIES: { id: CompanyPriority; label: string }[] = [

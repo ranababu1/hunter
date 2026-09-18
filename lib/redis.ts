@@ -324,3 +324,41 @@ export async function patchJobState(
   await recomputeAndStoreUsage(userId);
   return state;
 }
+
+const IMPORT_HASH_LIMIT = 50;
+
+/** Recent successful import content hashes (SHA-256 hex), newest last. */
+export async function getImportHashes(userId: string): Promise<string[]> {
+  const redis = getRedis();
+  if (!redis) return [];
+  try {
+    const raw = await redis.get<string | string[]>(u(userId).importHashes);
+    if (raw == null) return [];
+    const arr =
+      typeof raw === "string" ? (JSON.parse(raw) as unknown) : raw;
+    if (!Array.isArray(arr)) return [];
+    return arr.filter((h): h is string => typeof h === "string");
+  } catch (err) {
+    console.warn("[hunter] getImportHashes failed:", err);
+    return [];
+  }
+}
+
+export async function appendImportHash(
+  userId: string,
+  hash: string,
+): Promise<boolean> {
+  const redis = getRedis();
+  if (!redis) return false;
+  try {
+    const prev = await getImportHashes(userId);
+    const next = [...prev.filter((h) => h !== hash), hash].slice(
+      -IMPORT_HASH_LIMIT,
+    );
+    await redis.set(u(userId).importHashes, JSON.stringify(next));
+    return true;
+  } catch (err) {
+    console.warn("[hunter] appendImportHash failed:", err);
+    return false;
+  }
+}
