@@ -1,36 +1,76 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Hunter
 
-## Getting Started
+Private job-tracking HQ for Bengaluru AI / GenAI roles. Dark editorial UI with daily digest, consolidated board, and kanban — backed by Upstash Redis for visited + status.
 
-First, run the development server:
+**Repo:** [github.com/ranababu1/hunter](https://github.com/ranababu1/hunter)
+
+## Stack
+
+- Next.js 16 (App Router) + React 19 + TypeScript
+- Tailwind CSS v4
+- Upstash Redis (`@upstash/redis`)
+- Framer Motion + `@dnd-kit` for kanban
+
+## Setup
 
 ```bash
+cp .env.example .env.local
+# edit SITE_PASSWORD, UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN
+
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000). Without `SITE_PASSWORD`, middleware allows all routes (dev warning in logs).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Vercel environment variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Variable | Required | Notes |
+|---|---|---|
+| `SITE_PASSWORD` | Yes (prod) | Login gate password |
+| `UPSTASH_REDIS_REST_URL` | Recommended | Rest URL from Upstash console |
+| `UPSTASH_REDIS_REST_TOKEN` | Recommended | Rest token from Upstash console |
 
-## Learn More
+Without Redis, visited/status APIs no-op gracefully (empty state).
 
-To learn more about Next.js, take a look at the following resources:
+## Daily JSON update flow
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. Morning bot (or manual research) produces a daily digest JSON.
+2. Write `data/daily/YYYY-MM-DD.json` with shape:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```json
+{
+  "date": "2026-09-18",
+  "title": "Daily digest — Bengaluru AI / GenAI",
+  "jobs": [ /* Job objects */ ]
+}
+```
 
-## Deploy on Vercel
+3. Merge / upsert into `data/jobs.json` (consolidated board source of truth).
+4. Commit and push — Vercel rebuilds; Daily view picks the latest `data/daily/*.json` by filename.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Job fields: `id`, `company`, `role`, `level`, `aiFocus`, `location`, `postedOrUpdated`, `match`, `url`, `whyMatch`, `dateSeen`, `isNew`.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Branches
+
+- **`main`** — incremental development; push daily data updates here.
+- **Production deploys** — Vercel production tracks `main` (or your configured production branch). Preview deployments for PRs.
+
+## Auth
+
+- Cookie: `hunter_session` (httpOnly, sameSite=lax)
+- Token = HMAC-SHA256 of the site password
+- Protected: all routes except `/login` and `/api/auth/login`
+
+## Scripts
+
+```bash
+npm run dev      # local
+npm run build    # production build
+npm run start    # serve build
+npm run lint
+```
+
+## License
+
+Private — for personal use.
