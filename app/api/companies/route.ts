@@ -10,31 +10,9 @@ import {
 import { getBilling } from "@/lib/users";
 import { entitlementsForJson, resolveEntitlements } from "@/lib/plans";
 import type { CompanyPriority, CompanyProfile } from "@/lib/types";
+import { uniqueId } from "@/lib/companies";
 
 const PRIORITIES = new Set<CompanyPriority>(["high", "medium", "low"]);
-
-function slugify(name: string): string {
-  const base = name
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 48);
-  return base || "company";
-}
-
-function shortRandom(): string {
-  return Math.random().toString(36).slice(2, 6);
-}
-
-function uniqueId(name: string, existing: Set<string>): string {
-  let id = slugify(name);
-  if (!existing.has(id)) return id;
-  id = `${slugify(name)}-${shortRandom()}`;
-  while (existing.has(id)) {
-    id = `${slugify(name)}-${shortRandom()}`;
-  }
-  return id;
-}
 
 function asString(v: unknown, fallback = ""): string {
   if (typeof v === "string") return v.trim();

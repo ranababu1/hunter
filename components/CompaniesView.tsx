@@ -7,6 +7,7 @@ import {
   Pencil,
   Plus,
   Search,
+  Upload,
   Trash2,
   X,
 } from "lucide-react";
@@ -18,6 +19,12 @@ import Link from "next/link";
 import { QuotaBanner } from "@/components/QuotaBanner";
 
 type SortKey = "name" | "priority";
+
+type ImportSummary = {
+  imported: number;
+  updated: number;
+  skipped: { name: string; reason: string }[];
+};
 
 const PRIORITY_ORDER: Record<CompanyPriority, number> = {
   high: 0,
@@ -95,6 +102,7 @@ export function CompaniesView() {
   const [modal, setModal] = useState<
     | { mode: "add" }
     | { mode: "edit"; company: CompanyProfile }
+    | { mode: "import" }
     | null
   >(null);
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -102,6 +110,10 @@ export function CompaniesView() {
   const [formError, setFormError] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<CompanyProfile | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [importText, setImportText] = useState("");
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importSummary, setImportSummary] = useState<ImportSummary | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -202,6 +214,62 @@ export function CompaniesView() {
     setForm(fromCompany(company));
     setFormError(null);
     setModal({ mode: "edit", company });
+  }
+
+  function openImport() {
+    setImportText("");
+    setImportError(null);
+    setImportSummary(null);
+    setModal({ mode: "import" });
+  }
+
+  async function submitImport(e: React.FormEvent) {
+    e.preventDefault();
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(importText);
+    } catch {
+      setImportError("Enter valid JSON before importing.");
+      return;
+    }
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      setImportError("Import JSON must be an object mapping company names to URLs.");
+      return;
+    }
+
+    setImporting(true);
+    setImportError(null);
+    try {
+      const res = await fetch("/api/companies/import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(parsed),
+      });
+      const data = (await res.json()) as {
+        error?: string;
+        message?: string;
+        companies?: CompanyProfile[];
+        imported?: number;
+        updated?: number;
+        skipped?: { name: string; reason: string }[];
+      };
+      if (data.companies) setCompanies(data.companies);
+      if (data.imported != null || data.updated != null || data.skipped) {
+        setImportSummary({
+          imported: data.imported ?? 0,
+          updated: data.updated ?? 0,
+          skipped: data.skipped ?? [],
+        });
+      }
+      if (!res.ok) {
+        setImportError(data.message ?? data.error ?? "Import failed");
+        return;
+      }
+    } catch {
+      setImportError("Network error — could not import companies.");
+    } finally {
+      setImporting(false);
+    }
   }
 
   async function submitForm(e: React.FormEvent) {
@@ -335,18 +403,28 @@ export function CompaniesView() {
             {Number.isFinite(maxCompanies) ? ` / ${maxCompanies}` : " / ∞"}{" "}
             companies
           </span>
-          <button
-            type="button"
-            onClick={openAdd}
-            disabled={
-              Number.isFinite(maxCompanies) &&
-              companies.length >= maxCompanies
-            }
-            className="inline-flex items-center justify-center gap-2 rounded-full border border-[rgba(45,212,191,0.35)] bg-[var(--accent-soft)] px-4 py-2 text-sm font-medium text-[var(--accent)] transition hover:bg-[rgba(45,212,191,0.2)] disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <Plus className="h-4 w-4" />
-            Add company
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={openImport}
+              className="inline-flex items-center justify-center gap-2 rounded-full border border-[var(--border)] bg-[var(--bg-elevated)] px-4 py-2 text-sm font-medium text-[var(--text-muted)] transition hover:border-[var(--border-strong)] hover:text-[var(--text)]"
+            >
+              <Upload className="h-4 w-4" />
+              Import JSON
+            </button>
+            <button
+              type="button"
+              onClick={openAdd}
+              disabled={
+                Number.isFinite(maxCompanies) &&
+                companies.length >= maxCompanies
+              }
+              className="inline-flex items-center justify-center gap-2 rounded-full border border-[rgba(45,212,191,0.35)] bg-[var(--accent-soft)] px-4 py-2 text-sm font-medium text-[var(--accent)] transition hover:bg-[rgba(45,212,191,0.2)] disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              <Plus className="h-4 w-4" />
+              Add company
+            </button>
+          </div>
         </div>
       </div>
 
@@ -560,7 +638,7 @@ export function CompaniesView() {
       )}
 
       <AnimatePresence>
-        {modal && (
+        {modal && modal.mode !== "import" && (
           <>
             <motion.div
               className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
@@ -694,6 +772,98 @@ export function CompaniesView() {
                         : modal.mode === "add"
                           ? "Create"
                           : "Save changes"}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {modal?.mode === "import" && (
+          <>
+            <motion.div
+              className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setModal(null)}
+            />
+            <motion.div
+              className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 sm:items-center"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+            >
+              <div
+                className="glass my-4 w-full max-w-2xl rounded-2xl shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
+                  <div>
+                    <h2 className="prose-title text-xl">Import companies</h2>
+                    <p className="mt-1 text-xs text-[var(--text-muted)]">
+                      Map each company name to its careers or job-board URL.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setModal(null)}
+                    className="rounded-lg border border-[var(--border)] p-2 text-[var(--text-muted)] hover:text-[var(--text)]"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                <form onSubmit={submitImport} className="space-y-4 px-5 py-5">
+                  <label className="block space-y-1.5">
+                    <span className="eyebrow">JSON mapping</span>
+                    <textarea
+                      value={importText}
+                      onChange={(e) => setImportText(e.target.value)}
+                      rows={10}
+                      spellCheck={false}
+                      placeholder={'{\n  "NVIDIA": "https://nvidia.wd5.myworkdayjobs.com/...",\n  "Google": "https://www.google.com/about/careers/"\n}'}
+                      className="w-full resize-y rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 py-2 font-mono text-sm outline-none focus:border-[var(--accent)]"
+                    />
+                  </label>
+
+                  {importError && (
+                    <p className="text-sm text-[var(--danger)]">{importError}</p>
+                  )}
+
+                  {importSummary && (
+                    <div className="rounded-xl border border-[rgba(45,212,191,0.3)] bg-[var(--accent-soft)] px-4 py-3 text-sm">
+                      <p className="font-medium text-[var(--text)]">
+                        Imported {importSummary.imported}, updated {importSummary.updated}, skipped {importSummary.skipped.length}.
+                      </p>
+                      {importSummary.skipped.length > 0 && (
+                        <ul className="mt-2 space-y-1 text-xs text-[var(--text-muted)]">
+                          {importSummary.skipped.map((item, index) => (
+                            <li key={`${item.name}-${index}`}>
+                              {item.name || "(blank name)"}: {item.reason}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="flex justify-end gap-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setModal(null)}
+                      className="rounded-full border border-[var(--border)] px-4 py-2 text-sm text-[var(--text-muted)] hover:text-[var(--text)]"
+                    >
+                      Close
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={importing}
+                      className="rounded-full border border-[rgba(45,212,191,0.35)] bg-[var(--accent-soft)] px-4 py-2 text-sm font-medium text-[var(--accent)] disabled:opacity-50"
+                    >
+                      {importing ? "Importing…" : "Import"}
                     </button>
                   </div>
                 </form>
