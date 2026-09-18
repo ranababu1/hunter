@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ExternalLink, X, Eye } from "lucide-react";
 import type { Job, KanbanStatus } from "@/lib/types";
-import { KANBAN_COLUMNS } from "@/lib/types";
+import { ALL_STATUSES, normalizeStatus } from "@/lib/types";
 import { MatchBadge } from "./MatchBadge";
 
 export function JobDrawer({
@@ -32,6 +32,8 @@ export function JobDrawer({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
+
+  const current = status ? normalizeStatus(status) : "";
 
   return (
     <AnimatePresence>
@@ -103,16 +105,16 @@ export function JobDrawer({
               <section className="space-y-3">
                 <div className="eyebrow">Pipeline status</div>
                 <select
-                  value={status ?? ""}
+                  value={current}
                   onChange={(e) =>
                     onStatusChange(job.id, e.target.value as KanbanStatus)
                   }
-                  className="w-full rounded-xl border border-[var(--border-strong)] bg-[rgba(0,0,0,0.35)] px-3 py-2.5 text-sm outline-none focus:border-[var(--accent)]"
+                  className="w-full rounded-xl border border-[var(--border-strong)] bg-[var(--bg)] px-3 py-2.5 text-sm outline-none focus:border-[var(--accent)]"
                 >
                   <option value="" disabled>
                     Set status…
                   </option>
-                  {KANBAN_COLUMNS.map((c) => (
+                  {ALL_STATUSES.map((c) => (
                     <option key={c.id} value={c.id}>
                       {c.label}
                     </option>
@@ -136,10 +138,8 @@ export function JobDrawer({
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={() => onMarkVisited(job.id)}
-                className="flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-[#0a0b0f]"
-                style={{
-                  background: "linear-gradient(135deg, #f5e6b8, var(--accent))",
-                }}
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-medium text-[#0d1117]"
+                style={{ background: "var(--accent)" }}
               >
                 Open posting <ExternalLink className="h-4 w-4" />
               </a>

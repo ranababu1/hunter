@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { ExternalLink, MapPin, Sparkles } from "lucide-react";
 import clsx from "clsx";
 import type { Job, KanbanStatus } from "@/lib/types";
+import { isEndStatus, normalizeStatus, statusLabel } from "@/lib/types";
 import { MatchBadge } from "./MatchBadge";
 
 export function JobCard({
@@ -12,13 +13,20 @@ export function JobCard({
   status,
   onOpen,
   compact,
+  showEndBadge,
 }: {
   job: Job;
   visited?: boolean;
   status?: KanbanStatus;
   onOpen?: (job: Job) => void;
   compact?: boolean;
+  showEndBadge?: boolean;
 }) {
+  const normalized = status ? normalizeStatus(status) : undefined;
+  const showBadge =
+    normalized &&
+    (showEndBadge || isEndStatus(normalized) || !compact);
+
   return (
     <motion.article
       layout
@@ -32,7 +40,7 @@ export function JobCard({
         compact ? "rounded-xl" : "glass",
         visited
           ? "border-[var(--visited-border)] bg-[var(--visited)]"
-          : "border-[var(--border)] hover:border-[rgba(201,162,39,0.35)]",
+          : "border-[var(--border)] hover:border-[rgba(45,212,191,0.4)]",
       )}
       style={
         compact
@@ -51,7 +59,7 @@ export function JobCard({
               {job.company}
             </span>
             {job.isNew && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-[var(--violet-soft)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--violet)]">
+              <span className="inline-flex items-center gap-1 rounded-full bg-[rgba(88,166,255,0.14)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--possible)]">
                 <Sparkles className="h-3 w-3" />
                 NEW
               </span>
@@ -81,9 +89,16 @@ export function JobCard({
           {job.location}
         </span>
         <span>{job.level}</span>
-        {status && (
-          <span className="rounded-md border border-[var(--border)] px-1.5 py-0.5 text-[10px] uppercase tracking-wider">
-            {status.replace(/_/g, " ")}
+        {showBadge && normalized && (
+          <span
+            className={clsx(
+              "rounded-md border px-1.5 py-0.5 text-[10px] tracking-wide",
+              isEndStatus(normalized)
+                ? "border-[rgba(45,212,191,0.35)] bg-[var(--accent-soft)] text-[var(--accent)]"
+                : "border-[var(--border)] uppercase",
+            )}
+          >
+            {statusLabel(normalized)}
           </span>
         )}
         <a

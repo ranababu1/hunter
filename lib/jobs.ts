@@ -43,3 +43,13 @@ export async function listDailyDates(): Promise<string[]> {
     return [];
   }
 }
+
+export async function getAllDailyDigests(): Promise<DailyDigest[]> {
+  const dates = await listDailyDates();
+  const digests: DailyDigest[] = [];
+  for (const date of dates) {
+    const d = await getDailyDigest(date);
+    if (d) digests.push(d);
+  }
+  return digests;
+}

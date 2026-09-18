@@ -22,14 +22,14 @@ export function Nav() {
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-[rgba(10,11,15,0.82)] backdrop-blur-xl">
+    <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-[rgba(13,17,23,0.92)] backdrop-blur-md">
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
         <Link href="/" className="flex items-center gap-2.5">
           <div
             className="flex h-8 w-8 items-center justify-center rounded-lg"
             style={{
               background: "var(--accent-soft)",
-              border: "1px solid rgba(201,162,39,0.3)",
+              border: "1px solid rgba(45,212,191,0.35)",
             }}
           >
             <Crosshair className="h-4 w-4" style={{ color: "var(--accent)" }} />
@@ -37,7 +37,7 @@ export function Nav() {
           <span className="wordmark text-lg">Hunter</span>
         </Link>
 
-        <nav className="flex items-center gap-1 rounded-full border border-[var(--border)] bg-[rgba(255,255,255,0.03)] p-1">
+        <nav className="flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--bg-elevated)] p-1">
           {links.map(({ href, label, icon: Icon }) => {
             const active =
               href === "/"

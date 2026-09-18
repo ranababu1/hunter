@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import clsx from "clsx";
 import type { AppState, Job, KanbanStatus, MatchLevel } from "@/lib/types";
+import { normalizeStatus } from "@/lib/types";
 import { JobCard } from "./JobCard";
 import { JobDrawer } from "./JobDrawer";
 import { StatStrip } from "./StatStrip";
@@ -110,7 +111,7 @@ export function BoardView({
               className={clsx(
                 "rounded-full border px-3 py-1.5 text-xs font-medium transition",
                 match === f
-                  ? "border-[rgba(201,162,39,0.45)] bg-[var(--accent-soft)] text-[var(--accent)]"
+                  ? "border-[rgba(45,212,191,0.45)] bg-[var(--accent-soft)] text-[var(--accent)]"
                   : "border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text)]",
               )}
             >
@@ -126,7 +127,7 @@ export function BoardView({
             key={job.id}
             job={job}
             visited={visitedSet.has(job.id)}
-            status={state.status[job.id]}
+            status={state.status[job.id] ? normalizeStatus(state.status[job.id]) : undefined}
             onOpen={setSelected}
           />
         ))}
@@ -141,7 +142,7 @@ export function BoardView({
         job={selected}
         open={Boolean(selected)}
         visited={selected ? visitedSet.has(selected.id) : false}
-        status={selected ? state.status[selected.id] : undefined}
+        status={selected && state.status[selected.id] ? normalizeStatus(state.status[selected.id]) : undefined}
         onClose={() => setSelected(null)}
         onMarkVisited={(id) => patch(id, { visited: true })}
         onStatusChange={(id, status) => patch(id, { status, visited: true })}

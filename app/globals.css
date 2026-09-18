@@ -1,35 +1,33 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #0a0b0f;
-  --bg-elevated: #11131a;
-  --bg-panel: rgba(18, 20, 28, 0.72);
-  --border: rgba(255, 255, 255, 0.08);
-  --border-strong: rgba(255, 255, 255, 0.14);
-  --text: #f3f1eb;
-  --text-muted: #9a978c;
-  --text-dim: #6b685e;
-  --accent: #c9a227;
-  --accent-soft: rgba(201, 162, 39, 0.14);
-  --accent-glow: rgba(201, 162, 39, 0.35);
-  --violet: #8b7cf6;
-  --violet-soft: rgba(139, 124, 246, 0.16);
-  --visited: rgba(96, 165, 250, 0.18);
-  --visited-border: rgba(96, 165, 250, 0.45);
-  --strong: #34d399;
-  --good: #fbbf24;
-  --possible: #a78bfa;
-  --danger: #f87171;
-  --radius: 14px;
-  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
-  --font-serif: var(--font-geist-mono), ui-monospace, monospace;
+  --bg: #0d1117;
+  --bg-elevated: #161b22;
+  --bg-panel: #161b22;
+  --border: #30363d;
+  --border-strong: #484f58;
+  --text: #e6edf3;
+  --text-muted: #8b949e;
+  --text-dim: #6e7681;
+  --accent: #2dd4bf;
+  --accent-soft: rgba(45, 212, 191, 0.12);
+  --accent-glow: rgba(45, 212, 191, 0.25);
+  --visited: rgba(56, 139, 253, 0.12);
+  --visited-border: rgba(56, 139, 253, 0.45);
+  --strong: #3fb950;
+  --good: #d29922;
+  --possible: #58a6ff;
+  --danger: #f85149;
+  --radius: 12px;
+  --font-sans: var(--font-atkinson), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 @theme inline {
   --color-background: var(--bg);
   --color-foreground: var(--text);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-atkinson), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 * {
@@ -44,10 +42,7 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
-  background:
-    radial-gradient(1200px 600px at 10% -10%, rgba(201, 162, 39, 0.08), transparent 55%),
-    radial-gradient(900px 500px at 90% 0%, rgba(139, 124, 246, 0.07), transparent 50%),
-    var(--bg);
+  background: var(--bg);
   color: var(--text);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
@@ -59,10 +54,9 @@ body {
   color: var(--text);
 }
 
-/* Beautiful scrollbars */
 * {
   scrollbar-width: thin;
-  scrollbar-color: rgba(201, 162, 39, 0.35) transparent;
+  scrollbar-color: #484f58 transparent;
 }
 
 *::-webkit-scrollbar {
@@ -75,7 +69,7 @@ body {
 }
 
 *::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, rgba(201, 162, 39, 0.45), rgba(139, 124, 246, 0.35));
+  background: #484f58;
   border-radius: 999px;
   border: 2px solid transparent;
   background-clip: padding-box;
@@ -84,36 +78,29 @@ body {
 .glass {
   background: var(--bg-panel);
   border: 1px solid var(--border);
-  backdrop-filter: blur(18px) saturate(140%);
-  -webkit-backdrop-filter: blur(18px) saturate(140%);
   border-radius: var(--radius);
-  box-shadow:
-    0 0 0 1px rgba(255, 255, 255, 0.02) inset,
-    0 20px 50px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.02) inset;
 }
 
 .wordmark {
   font-family: var(--font-sans);
-  font-weight: 650;
-  letter-spacing: -0.04em;
-  background: linear-gradient(135deg, #f5e6b8 0%, var(--accent) 45%, #8b7cf6 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--text);
 }
 
 .eyebrow {
   font-size: 0.7rem;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--text-dim);
   font-weight: 600;
 }
 
 .prose-title {
-  font-family: Georgia, "Times New Roman", serif;
-  letter-spacing: -0.02em;
-  font-weight: 500;
+  font-family: var(--font-sans);
+  letter-spacing: -0.025em;
+  font-weight: 700;
 }
 
 a {
@@ -139,5 +126,5 @@ select {
 }
 
 .fade-up {
-  animation: fade-up 0.45s ease both;
+  animation: fade-up 0.35s ease both;
 }

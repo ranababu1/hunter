@@ -1,16 +1,20 @@
-import { getDailyDigest } from "@/lib/jobs";
+import {
+  getAllDailyDigests,
+  listDailyDates,
+} from "@/lib/jobs";
 import { getAppState } from "@/lib/redis";
 import { DailyView } from "@/components/DailyView";
 
 export const dynamic = "force-dynamic";
 
 export default async function DailyPage() {
-  const [digest, state] = await Promise.all([
-    getDailyDigest(),
+  const [dates, digests, state] = await Promise.all([
+    listDailyDates(),
+    getAllDailyDigests(),
     getAppState(),
   ]);
 
-  if (!digest) {
+  if (digests.length === 0) {
     return (
       <div className="glass p-10 text-center text-[var(--text-muted)]">
         No daily digests yet. Drop a file into{" "}
@@ -19,11 +23,13 @@ export default async function DailyPage() {
     );
   }
 
+  const initialDate = dates[0] ?? digests[0].date;
+
   return (
     <DailyView
-      title={digest.title}
-      date={digest.date}
-      jobs={digest.jobs}
+      dates={dates}
+      digests={digests}
+      initialDate={initialDate}
       initialState={state}
     />
   );
