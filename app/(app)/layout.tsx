@@ -1,4 +1,5 @@
 import { Nav } from "@/components/Nav";
+import { AppMain } from "@/components/AppMain";
 
 export default function AppLayout({
   children,
@@ -8,9 +9,7 @@ export default function AppLayout({
   return (
     <div className="min-h-screen">
       <Nav />
-      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 sm:py-10">
-        {children}
-      </main>
+      <AppMain>{children}</AppMain>
     </div>
   );
 }

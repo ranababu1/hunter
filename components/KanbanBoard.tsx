@@ -94,7 +94,7 @@ function Column({
   return (
     <div
       className={clsx(
-        "flex w-72 shrink-0 flex-col rounded-xl border",
+        "flex w-72 shrink-0 flex-col rounded-xl border md:w-auto md:min-w-0 md:flex-1 md:shrink",
         isOver
           ? "border-[rgba(45,212,191,0.5)] bg-[var(--accent-soft)]"
           : "border-[var(--border)] bg-[var(--bg-elevated)]",
@@ -423,7 +423,7 @@ export function KanbanBoard({
         onDragStart={onDragStart}
         onDragEnd={onDragEnd}
       >
-        <div className="flex gap-3 overflow-x-auto pb-4">
+        <div className="flex gap-3 overflow-x-auto pb-4 md:min-h-[calc(100vh-11rem)] md:overflow-x-visible">
           {KANBAN_BOARD_COLUMNS.map((col) => (
             <Column
               key={col.id}
