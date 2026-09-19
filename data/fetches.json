@@ -1,414 +1,430 @@
 {
-  "runDate": "2026-09-18",
-  "updatedAt": "2026-09-18T10:30:00+05:30",
+  "runDate": "2026-09-19",
+  "updatedAt": "2026-09-19T09:22:34+05:30",
   "companies": [
     {
       "company": "Adobe",
       "careerPortal": "https://adobe.wd5.myworkdayjobs.com/external_experienced",
       "jobsFetched": 1,
-      "lastFetched": "2026-09-18",
+      "lastFetched": "2026-09-19",
       "outcome": "ok",
-      "notes": "Workday CXS — Technical Architect Agentic AI"
+      "notes": "Workday CXS OK. Phenom careers.adobe.com shows conflicting 'filled' banner while Workday canApply=true for R169919 — included with caveat."
     },
     {
       "company": "Amazon / AWS",
       "careerPortal": "https://www.amazon.jobs/",
-      "jobsFetched": 2,
-      "lastFetched": "2026-09-18",
+      "jobsFetched": 3,
+      "lastFetched": "2026-09-19",
       "outcome": "ok",
-      "notes": "amazon.jobs — Senior AI SA + Agentic SA"
-    },
-    {
-      "company": "Anthropic",
-      "careerPortal": "https://job-boards.greenhouse.io/anthropic",
-      "jobsFetched": 1,
-      "lastFetched": "2026-09-18",
-      "outcome": "ok",
-      "notes": "Greenhouse — Applied AI Architect (Bangalore)"
-    },
-    {
-      "company": "Apple",
-      "careerPortal": "https://jobs.apple.com/",
-      "jobsFetched": 1,
-      "lastFetched": "2026-09-18",
-      "outcome": "ok",
-      "notes": "ML Engineer Apple Intelligence — Possible Match; JD SPA-limited"
-    },
-    {
-      "company": "Cisco",
-      "careerPortal": "https://jobs.cisco.com/",
-      "jobsFetched": 1,
-      "lastFetched": "2026-09-18",
-      "outcome": "ok",
-      "notes": "Workday — AI Operations Engineer"
-    },
-    {
-      "company": "Cloudflare",
-      "careerPortal": "https://boards.greenhouse.io/cloudflare",
-      "jobsFetched": 1,
-      "lastFetched": "2026-09-18",
-      "outcome": "ok",
-      "notes": "Greenhouse — Software Engineer, AI Agents (Bangalore)"
-    },
-    {
-      "company": "Databricks",
-      "careerPortal": "https://www.databricks.com/company/careers",
-      "jobsFetched": 1,
-      "lastFetched": "2026-09-18",
-      "outcome": "ok",
-      "notes": "Specialist SA AI/ML"
-    },
-    {
-      "company": "Flipkart",
-      "careerPortal": "https://www.flipkartcareers.com/",
-      "jobsFetched": 1,
-      "lastFetched": "2026-09-18",
-      "outcome": "ok",
-      "notes": "Consolidated board role; batch notes flagged aggregator-only verification risk"
-    },
-    {
-      "company": "Goldman Sachs",
-      "careerPortal": "https://higher.gs.com/",
-      "jobsFetched": 1,
-      "lastFetched": "2026-09-18",
-      "outcome": "ok",
-      "notes": "higher.gs.com — AI Innovation Acceleration VP"
-    },
-    {
-      "company": "Google",
-      "careerPortal": "https://www.google.com/about/careers/applications/",
-      "jobsFetched": 1,
-      "lastFetched": "2026-09-18",
-      "outcome": "ok",
-      "notes": "GenAI FDE on consolidated board (batch also verified Ads GenAI + Geo Agentic)"
-    },
-    {
-      "company": "InMobi",
-      "careerPortal": "https://boards.greenhouse.io/inmobi",
-      "jobsFetched": 1,
-      "lastFetched": "2026-09-18",
-      "outcome": "ok",
-      "notes": "Greenhouse SDE II – AI — Possible Match (3–5 yr band)"
-    },
-    {
-      "company": "Microsoft",
-      "careerPortal": "https://careers.microsoft.com/",
-      "jobsFetched": 1,
-      "lastFetched": "2026-09-18",
-      "outcome": "ok",
-      "notes": "CoreAI SWE II; Principal PM Hyderabad-primary excluded"
-    },
-    {
-      "company": "NVIDIA",
-      "careerPortal": "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite",
-      "jobsFetched": 1,
-      "lastFetched": "2026-09-18",
-      "outcome": "ok",
-      "notes": "GenAI SA-CSP; older JR posting expired (validThrough 2025-06-28)"
-    },
-    {
-      "company": "OpenAI",
-      "careerPortal": "https://openai.com/careers",
-      "jobsFetched": 2,
-      "lastFetched": "2026-09-18",
-      "outcome": "ok",
-      "notes": "Ashby/careers — Applied AI Architect + Partner AI Deployment Engineer"
-    },
-    {
-      "company": "Oracle",
-      "careerPortal": "https://careers.oracle.com/",
-      "jobsFetched": 1,
-      "lastFetched": "2026-09-18",
-      "outcome": "ok",
-      "notes": "On consolidated board; batch A initially lacked a reliable official req URL"
-    },
-    {
-      "company": "Palo Alto Networks",
-      "careerPortal": "https://jobs.paloaltonetworks.com/",
-      "jobsFetched": 2,
-      "lastFetched": "2026-09-18",
-      "outcome": "ok",
-      "notes": "Senior Staff IT SWE (AI & SAP) + Staff ML Engineer"
-    },
-    {
-      "company": "SAP Labs",
-      "careerPortal": "https://jobs.sap.com/",
-      "jobsFetched": 1,
-      "lastFetched": "2026-09-18",
-      "outcome": "ok",
-      "notes": "jobs.sap.com — 1 on board (batch also verified Expert Agentic + OCTO DistSys+AI)"
-    },
-    {
-      "company": "Thoughtworks",
-      "careerPortal": "https://www.thoughtworks.com/careers",
-      "jobsFetched": 1,
-      "lastFetched": "2026-09-18",
-      "outcome": "ok",
-      "notes": "On consolidated board"
-    },
-    {
-      "company": "Visa",
-      "careerPortal": "https://visa.wd5.myworkdayjobs.com/Visa",
-      "jobsFetched": 1,
-      "lastFetched": "2026-09-18",
-      "outcome": "ok",
-      "notes": "Workday REF080421W GenAI Architecture Sr Consultant"
-    },
-    {
-      "company": "Wells Fargo",
-      "careerPortal": "https://wf.wd1.myworkdayjobs.com/wellsfargojobs",
-      "jobsFetched": 1,
-      "lastFetched": "2026-09-18",
-      "outcome": "ok",
-      "notes": "Workday R-566518 Principal Engineer Gen AI"
+      "notes": "amazon.jobs search.json + job pages. Includes new Principal Data and Agentic Architect 10472149."
     },
     {
       "company": "AMD",
       "careerPortal": "https://careers.amd.com/",
-      "jobsFetched": 0,
-      "lastFetched": "2026-09-18",
-      "outcome": "zero",
-      "issue": "Careers UI did not yield extractable Bangalore AI architect listings"
+      "jobsFetched": 3,
+      "lastFetched": "2026-09-19",
+      "outcome": "ok",
+      "notes": "AMD careers JSON API; verified open Bangalore AI roles (73004, 85459, 84934). Excluded Lead/Staff AI/ML Validation (87968) — HIP runtime QA not GenAI/platform leadership. Older web hits 88801/77304/79873 returned 404."
     },
     {
       "company": "American Express",
       "careerPortal": "https://aexp.eightfold.ai/careers",
       "jobsFetched": 0,
-      "lastFetched": "2026-09-18",
-      "outcome": "zero",
-      "issue": "Bengaluru location page indicated no openings; Staff Agentic AI BuiltIn was multi-location without official aexp URL"
+      "lastFetched": "2026-09-19",
+      "outcome": "error",
+      "issue": "Eightfold jobs API returned 404; Bengaluru location page indicated no openings previously",
+      "notes": "Staff AI Engineer Enterprise Architecture aggregator-only → excluded."
+    },
+    {
+      "company": "Anthropic",
+      "careerPortal": "https://job-boards.greenhouse.io/anthropic",
+      "jobsFetched": 2,
+      "lastFetched": "2026-09-19",
+      "outcome": "ok",
+      "notes": "Greenhouse boards API; 2 Bangalore Applied AI Architect roles confirmed."
+    },
+    {
+      "company": "Apple",
+      "careerPortal": "https://jobs.apple.com/",
+      "jobsFetched": 1,
+      "lastFetched": "2026-09-19",
+      "outcome": "ok",
+      "notes": "jobs.apple.com role page 200 for 200645256-0321 Bengaluru. Search API returned 411; detail page used for verification."
     },
     {
       "company": "Atlassian",
       "careerPortal": "https://www.atlassian.com/company/careers",
       "jobsFetched": 0,
-      "lastFetched": "2026-09-18",
-      "outcome": "zero",
-      "issue": "Bangalore careers filter checked; no verified qualifying AI/architect posting extracted"
+      "lastFetched": "2026-09-19",
+      "outcome": "error",
+      "issue": "Careers all-jobs UI is JS-rendered with no usable public jobs API (Greenhouse/Lever/Ashby/Workday hosts 404/unresolved; gateway search 400/404). Could not verify any official Bengaluru AI/GenAI URL — third-party Muse listings were US/remote only."
     },
     {
       "company": "Broadcom / VMware",
       "careerPortal": "https://careers.broadcom.com/",
       "jobsFetched": 0,
-      "lastFetched": "2026-09-18",
+      "lastFetched": "2026-09-19",
       "outcome": "zero",
-      "issue": "No verified Bengaluru AI/GenAI architect openings confirmed this run"
+      "issue": "Workday CXS External_Career reachable (370 postings) but Bangalore location facet queries returned HTTP 400 after rate-limit; WebSearch found no verified Bengaluru AI/GenAI/architect openings. careers.broadcom.com fetch failed (HTTP 000).",
+      "notes": "Facet IDs seen for IND-Bangalore Electronic City (40), Kalyani Vista II (7), Bangalore-Remote (1) — listing extract blocked this run."
+    },
+    {
+      "company": "Cisco",
+      "careerPortal": "https://jobs.cisco.com/",
+      "jobsFetched": 1,
+      "lastFetched": "2026-09-19",
+      "outcome": "ok",
+      "notes": "Workday CXS job detail for 2021635 OK. Broad jobs.cisco.com keyword search redirects/HTML-limited."
+    },
+    {
+      "company": "Cloudflare",
+      "careerPortal": "https://boards.greenhouse.io/cloudflare",
+      "jobsFetched": 1,
+      "lastFetched": "2026-09-19",
+      "outcome": "ok",
+      "notes": "Greenhouse boards API; only Bengaluru AI-titled role was SWE AI Agents 7831810."
     },
     {
       "company": "Cohere",
       "careerPortal": "https://cohere.com/careers",
       "jobsFetched": 0,
-      "lastFetched": "2026-09-18",
+      "lastFetched": "2026-09-19",
       "outcome": "zero",
-      "issue": "No verified Bengaluru/Bangalore open AI roles found on official boards this run"
+      "issue": "Ashby API (cohere) returned 142 jobs; zero India/Bangalore locations."
     },
     {
       "company": "Confluent",
       "careerPortal": "https://careers.confluent.io/",
       "jobsFetched": 0,
-      "lastFetched": "2026-09-18",
+      "lastFetched": "2026-09-19",
       "outcome": "zero",
-      "issue": "General careers; no Bengaluru GenAI/AI Architect posting verified"
+      "issue": "Ashby API (confluent) — only India hit was remote India SRE (not AI; not Bengaluru-specific). No Bangalore AI/GenAI/architect roles."
     },
     {
       "company": "CRED",
       "careerPortal": "https://careers.cred.club/",
       "jobsFetched": 0,
-      "lastFetched": "2026-09-18",
+      "lastFetched": "2026-09-19",
       "outcome": "zero",
-      "issue": "No verified Bengaluru AI/GenAI posting found"
+      "issue": "Lever API (cred) — 8 Bangalore postings; none AI/GenAI/ML/architect qualifying (collections, partnerships, content, payments)."
+    },
+    {
+      "company": "Databricks",
+      "careerPortal": "https://www.databricks.com/company/careers",
+      "jobsFetched": 1,
+      "lastFetched": "2026-09-19",
+      "outcome": "ok",
+      "notes": "Greenhouse boards API; Specialist SA AI/ML 8585164002 Bengaluru confirmed. Other BLR SA/AI titles exist but only profile-priority SA AI/ML included."
     },
     {
       "company": "Elastic",
       "careerPortal": "https://jobs.elastic.co/",
       "jobsFetched": 0,
-      "lastFetched": "2026-09-18",
-      "outcome": "error",
-      "issue": "AI QA/Eval greenhouse IDs found but location not confirmed Bengaluru; fetch redirect issues"
+      "lastFetched": "2026-09-19",
+      "outcome": "zero",
+      "issue": "Greenhouse (elastic) — 10 Bangalore jobs; only AI-titled role was Lead Salesforce Full Stack AI Engineer (Salesforce/MuleSoft + AI coding tools), excluded as not GenAI/platform architecture. No other qualifying Bengaluru AI roles.",
+      "notes": "Checked Bangalore titles via boards-api.greenhouse.io/v1/boards/elastic/jobs"
+    },
+    {
+      "company": "Flipkart",
+      "careerPortal": "https://www.flipkartcareers.com/",
+      "jobsFetched": 0,
+      "lastFetched": "2026-09-19",
+      "outcome": "zero",
+      "issue": "SPA/job list did not expose verifiable AI Architect/GenAI JD URLs",
+      "notes": "Careers site JS-heavy; aggregator AI Architect mentions without official open URL → excluded."
     },
     {
       "company": "Freshworks",
       "careerPortal": "https://www.freshworks.com/company/careers/",
-      "jobsFetched": 0,
-      "lastFetched": "2026-09-18",
-      "outcome": "zero",
-      "issue": "SmartRecruiters Lead SWE–ML JD strong but page did not confirm Bengaluru (Hyderabad also reported)"
+      "jobsFetched": 1,
+      "lastFetched": "2026-09-19",
+      "outcome": "ok",
+      "notes": "SmartRecruiters API companies/Freshworks; verified Lead Data Scientist GenAI Bengaluru hybrid (744000148710569)."
     },
     {
       "company": "Glean",
       "careerPortal": "https://www.glean.com/careers",
-      "jobsFetched": 0,
-      "lastFetched": "2026-09-18",
-      "outcome": "zero",
-      "issue": "No verified Bengaluru/Bangalore open AI roles found on official boards this run"
+      "jobsFetched": 4,
+      "lastFetched": "2026-09-19",
+      "outcome": "ok",
+      "notes": "Greenhouse gleanwork; 25 Bangalore jobs; included Agents, Agents Governance, Evals, ML. Excluded AI Success Manager / AI Data Analyst / non-AI ops."
+    },
+    {
+      "company": "Goldman Sachs",
+      "careerPortal": "https://higher.gs.com/",
+      "jobsFetched": 2,
+      "lastFetched": "2026-09-19",
+      "outcome": "ok",
+      "notes": "Re-verified 182438 VP + 182439 Associate AI Innovation Acceleration via HTTP 200 + embedded POSTED/applyActive. No additional Bengaluru GenAI leadership roles verified on higher.gs.com this run."
+    },
+    {
+      "company": "Google",
+      "careerPortal": "https://www.google.com/about/careers/applications/",
+      "jobsFetched": 6,
+      "lastFetched": "2026-09-19",
+      "outcome": "ok",
+      "notes": "Official careers detail pages. Re-verified 3 prior + 3 new BLR GenAI/Agentic/EM roles."
     },
     {
       "company": "IBM",
       "careerPortal": "https://www.ibm.com/careers/",
       "jobsFetched": 0,
-      "lastFetched": "2026-09-18",
+      "lastFetched": "2026-09-19",
       "outcome": "zero",
-      "issue": "careers.ibm.com GenAI+Bangalore search returned no usable JobDetail; watsonx hub only"
+      "issue": "Search/hub pages only; no verifiable open Bengaluru GenAI/architect JobDetail URL",
+      "notes": "watsonx careers hub present; LinkedIn profiles insufficient for verification."
+    },
+    {
+      "company": "InMobi",
+      "careerPortal": "https://boards.greenhouse.io/inmobi",
+      "jobsFetched": 3,
+      "lastFetched": "2026-09-19",
+      "outcome": "ok",
+      "notes": "Greenhouse API 63 jobs: SDE II AI 8073988 re-verified; NEW Staff Engineer Salesforce AI 8019835 + Staff ML Manager 7795140 (Bangalore). Lucknow ML roles excluded."
     },
     {
       "company": "Intel",
       "careerPortal": "https://jobs.intel.com/",
       "jobsFetched": 0,
-      "lastFetched": "2026-09-18",
-      "outcome": "error",
-      "issue": "Careers site returned HTTP 403 from this environment"
+      "lastFetched": "2026-09-19",
+      "outcome": "zero",
+      "issue": "jobs.intel.com returned 403 from this environment. Workday External CXS intermittently rate-limited (400). WebFetch confirmed Robotics & Physical AI Developer Support Engineer Bangalore open (JR0286420) but DevRel/community support — excluded as not architecture/leadership GenAI. GenAI Software Architect JR0279697/JR0279700 pages not verifiable/appear unavailable.",
+      "notes": "No qualifying verified Bengaluru AI architecture/leadership roles retained."
     },
     {
       "company": "Intuit",
       "careerPortal": "https://jobs.intuit.com/",
-      "jobsFetched": 0,
-      "lastFetched": "2026-09-18",
-      "outcome": "zero",
-      "issue": "Page loaded; no verified qualifying AI architect/GenAI role confirmed"
+      "jobsFetched": 2,
+      "lastFetched": "2026-09-19",
+      "outcome": "ok",
+      "notes": "NEW Senior Staff Agent Ready Platform + Staff ML Engineering Bangalore verified. Principal AI Scientist (marketing) deprioritized as weaker GenAI-platform match."
     },
     {
       "company": "JPMorgan Chase",
       "careerPortal": "https://careers.jpmorgan.com/",
       "jobsFetched": 0,
-      "lastFetched": "2026-09-18",
+      "lastFetched": "2026-09-19",
       "outcome": "zero",
-      "issue": "Evenbreak listed Director Applied AI ML (Bengaluru) but no official jpmorganchase.com/Workday URL found"
+      "issue": "Aggregator Director Applied AI / Agentic without confirmed official jpmorganchase.com/Workday URL",
+      "notes": "Excluded per verified-URL rule (same as yesterday)."
     },
     {
       "company": "Mastercard",
       "careerPortal": "https://careers.mastercard.com/",
       "jobsFetched": 0,
-      "lastFetched": "2026-09-18",
+      "lastFetched": "2026-09-19",
       "outcome": "zero",
-      "issue": "India AI Engineer hits pointed to Gurgaon/Pune; no Bengaluru GenAI/architect posting verified"
+      "issue": "Workday CXS search HTTP 400; AI roles appear Pune/Gurgaon-centric",
+      "notes": "No Bengaluru GenAI/architect posting verified."
     },
     {
       "company": "Meesho",
       "careerPortal": "https://meesho.io/careers",
-      "jobsFetched": 0,
-      "lastFetched": "2026-09-18",
-      "outcome": "zero",
-      "issue": "Apna aggregator EM–AI Engineering Bengaluru JD looks strong; no official Meesho careers URL confirmed open"
+      "jobsFetched": 3,
+      "lastFetched": "2026-09-19",
+      "outcome": "ok",
+      "notes": "Lever API meesho; included EM AI Engineering, Director Data Science, Security Architect AI-Powered."
     },
     {
       "company": "Meta",
       "careerPortal": "https://www.metacareers.com/",
       "jobsFetched": 0,
-      "lastFetched": "2026-09-18",
+      "lastFetched": "2026-09-19",
       "outcome": "error",
-      "issue": "metacareers.com returned SPA shells / HTTP 400 on job detail URLs — could not verify open Bengaluru GenAI Partner Engineer posting"
+      "issue": "metacareers.com returns SPA shell without extractable job IDs via curl/WebFetch (API 429/400). WebSearch found no verified Bengaluru GenAI/AI Architect openings on metacareers.com — no fabricated roles."
+    },
+    {
+      "company": "Microsoft",
+      "careerPortal": "https://careers.microsoft.com/",
+      "jobsFetched": 1,
+      "lastFetched": "2026-09-19",
+      "outcome": "ok",
+      "notes": "apply.careers.microsoft.com JobPosting schema verified for CoreAI SWE II. gcsservices search API SSL/404 from this environment."
     },
     {
       "company": "Mistral AI",
       "careerPortal": "https://mistral.ai/careers",
       "jobsFetched": 0,
-      "lastFetched": "2026-09-18",
+      "lastFetched": "2026-09-19",
       "outcome": "zero",
-      "issue": "No verified Bengaluru/Bangalore open AI roles found on official boards this run"
+      "issue": "Ashby public posting API 404 for mistral/mistralai/mistral-ai slugs; careers page embeds ashbyhq.com/mistral but HTML contained zero Bangalore/India location strings. No verified Bengaluru openings."
     },
     {
       "company": "Nutanix",
       "careerPortal": "https://www.nutanix.com/careers",
       "jobsFetched": 0,
-      "lastFetched": "2026-09-18",
-      "outcome": "error",
-      "issue": "Staff Engineer/Tech Lead AI/ML careers URL returned 404"
+      "lastFetched": "2026-09-19",
+      "outcome": "zero",
+      "issue": "careers.nutanix.com / eightfold paths 404; Greenhouse/Lever slugs not found; Workday tenant probes failed (401/422/500). No verified Bangalore AI roles extracted.",
+      "notes": "Portal discovery incomplete — treat as blocked/zero for this run."
+    },
+    {
+      "company": "NVIDIA",
+      "careerPortal": "https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite",
+      "jobsFetched": 3,
+      "lastFetched": "2026-09-19",
+      "outcome": "ok",
+      "notes": "Workday CXS. CSP JR2018138 re-verified; added JR2018786 and JR1993430 Bengaluru GenAI SA roles."
+    },
+    {
+      "company": "OpenAI",
+      "careerPortal": "https://openai.com/careers",
+      "jobsFetched": 2,
+      "lastFetched": "2026-09-19",
+      "outcome": "ok",
+      "notes": "Ashby job-board API + openai.com/careers pages. Applied AI Architect Bengaluru-eligible per JD; Partner role Bangalore-based."
+    },
+    {
+      "company": "Oracle",
+      "careerPortal": "https://careers.oracle.com/",
+      "jobsFetched": 0,
+      "lastFetched": "2026-09-19",
+      "outcome": "zero",
+      "issue": "Official Oracle CE recruiting API: 0 jobs for keyword Generative AI + Bengaluru location; AI Architect keyword search had no Bengaluru matches (India hit was Chennai Multi-Cloud SA — excluded as not Bengaluru)."
+    },
+    {
+      "company": "Palo Alto Networks",
+      "careerPortal": "https://jobs.paloaltonetworks.com/",
+      "jobsFetched": 3,
+      "lastFetched": "2026-09-19",
+      "outcome": "ok",
+      "notes": "Re-verified AI&SAP Senior Staff + Staff ML; NEW Staff AI Engineer JR-021986. Aggregator Sr Staff MLOps GenAI Security not included without confirmed official URL."
     },
     {
       "company": "Perplexity",
       "careerPortal": "https://www.perplexity.ai/careers",
       "jobsFetched": 0,
-      "lastFetched": "2026-09-18",
+      "lastFetched": "2026-09-19",
       "outcome": "zero",
-      "issue": "No verified Bengaluru/Bangalore open AI roles found on official boards this run"
+      "issue": "Ashby API (perplexity) — 118 jobs; zero India/Bangalore locations."
     },
     {
       "company": "PhonePe",
       "careerPortal": "https://www.phonepe.com/careers/",
       "jobsFetched": 0,
-      "lastFetched": "2026-09-18",
-      "outcome": "zero",
-      "issue": "Greenhouse Staff Engineer found was Kafka infra, not AI"
+      "lastFetched": "2026-09-19",
+      "outcome": "error",
+      "issue": "Careers site is Gatsby SPA without public Greenhouse/Lever/Ashby/SmartRecruiters job feed (SR PhonePe totalFound=0). Could not enumerate/verify open Bengaluru AI roles from official API.",
+      "notes": "No invented listings; outcome error due to closed/opaque portal."
     },
     {
       "company": "Qualcomm",
       "careerPortal": "https://careers.qualcomm.com/",
       "jobsFetched": 0,
-      "lastFetched": "2026-09-18",
-      "outcome": "zero",
-      "issue": "Careers search; no verified Bengaluru AI Platform/architect JD confirmed"
+      "lastFetched": "2026-09-19",
+      "outcome": "error",
+      "issue": "Eightfold/careers API returned 403 Not authorized for PCSX. careers.qualcomm.com is JS-heavy; no verified Bengaluru AI/architect JD captured without inventing from LinkedIn.",
+      "notes": "WebSearch mentioned India AI hiring but lacked verifyable official req URLs this run."
     },
     {
       "company": "Razorpay",
       "careerPortal": "https://razorpay.com/jobs/",
       "jobsFetched": 0,
-      "lastFetched": "2026-09-18",
+      "lastFetched": "2026-09-19",
       "outcome": "zero",
-      "issue": "Lead AI Engineer (inference platform) marked no longer accepting on TCV board"
+      "issue": "Greenhouse razorpaysoftwareprivatelimited — 10 Bangalore jobs; no AI/GenAI/ML/architect engineering titles (AEO Manager is GTM/marketing; company blurb mentions AI but role is not AI eng).",
+      "notes": "Checked full board with content=true."
     },
     {
       "company": "Red Hat",
       "careerPortal": "https://www.redhat.com/en/jobs",
       "jobsFetched": 0,
-      "lastFetched": "2026-09-18",
+      "lastFetched": "2026-09-19",
       "outcome": "zero",
-      "issue": "AI Engineering hub page only; Principal SWE–AI aggregators without live redhat.com job URL"
+      "issue": "Workday redhat.wd5 site 'jobs' — India location facet shows 5 jobs; searches for Machine Learning/GenAI/LLM/AI Architect did not yield qualifying Bangalore AI architecture/leadership openings (Bangalore hit was Business/Data Analyst Training). Later CXS calls rate-limited HTTP 400.",
+      "notes": "No verified qualifying Bengaluru AI roles retained."
     },
     {
       "company": "Rubrik",
       "careerPortal": "https://www.rubrik.com/company/careers",
-      "jobsFetched": 0,
-      "lastFetched": "2026-09-18",
-      "outcome": "zero",
-      "issue": "Senior SWE Enterprise AI (gh_jid 7849713) reported removed ~May 2026 on BuiltIn"
+      "jobsFetched": 2,
+      "lastFetched": "2026-09-19",
+      "outcome": "ok",
+      "notes": "Greenhouse rubrik; included Architect AI Data Platform + Senior SWE Enterprise AI. Excluded non-AI Bangalore titles (Hypervisor EM, Cyber Resilience Architect, etc.)."
     },
     {
       "company": "Salesforce",
       "careerPortal": "https://careers.salesforce.com/",
       "jobsFetched": 0,
-      "lastFetched": "2026-09-18",
-      "outcome": "error",
-      "issue": "Workday path JR333491 returned postingAvailable: false — treated as closed/unavailable"
+      "lastFetched": "2026-09-19",
+      "outcome": "zero",
+      "issue": "JR333491 Principal Data and AI Architect page did not confirm Bangalore location in fetch",
+      "notes": "Foundit/aggregators claim Bengaluru; official page insufficient location proof → excluded. Agentforce Solution Architect multi-location Hyderabad/Bangalore not verified exclusive BLR."
+    },
+    {
+      "company": "SAP Labs",
+      "careerPortal": "https://jobs.sap.com/",
+      "jobsFetched": 7,
+      "lastFetched": "2026-09-19",
+      "outcome": "ok",
+      "notes": "jobs.sap.com Bangalore AI search returned many hits. Reported: 3 re-verified + 4 new (Principal AI Architect OCTO, DS Expert 8-16Y, DS Leader HCM, Applied Science Expert Data Labs). Additional DS Leaders/Chief Experts/Senior DS exist — not all duplicated."
     },
     {
       "company": "Scale AI",
       "careerPortal": "https://scale.com/careers",
       "jobsFetched": 0,
-      "lastFetched": "2026-09-18",
+      "lastFetched": "2026-09-19",
       "outcome": "zero",
-      "issue": "No verified Bengaluru/Bangalore open AI roles found on official boards this run"
+      "issue": "Greenhouse scaleai — 224 jobs; zero Bangalore/Bengaluru locations."
     },
     {
       "company": "ServiceNow",
       "careerPortal": "https://careers.servicenow.com/",
-      "jobsFetched": 0,
-      "lastFetched": "2026-09-18",
-      "outcome": "error",
-      "issue": "careers.servicenow.com agentic URL returned 404"
+      "jobsFetched": 1,
+      "lastFetched": "2026-09-19",
+      "outcome": "ok",
+      "notes": "Advisory AI Foundry Architect Bangalore open. Senior Staff AI-Native Agentic Systems 744000127578599 → 404 closed."
     },
     {
       "company": "Snowflake",
       "careerPortal": "https://careers.snowflake.com/",
       "jobsFetched": 0,
-      "lastFetched": "2026-09-18",
+      "lastFetched": "2026-09-19",
       "outcome": "zero",
-      "issue": "Careers search thin/SPA; no verified Bengaluru AI architect JD captured"
+      "issue": "Phenom search AI OR GenAI + Bangalore returned hits:0 (site shows Bengaluru jobs exist generally but none matched AI/GenAI keywords).",
+      "notes": "Phenom search AI OR GenAI + Bangalore returned hits:0 (site shows Bengaluru jobs exist generally but none matched AI/GenAI keywords)."
     },
     {
       "company": "Swiggy",
       "careerPortal": "https://careers.swiggy.com/",
       "jobsFetched": 0,
-      "lastFetched": "2026-09-18",
+      "lastFetched": "2026-09-19",
       "outcome": "error",
-      "issue": "careers.swiggy.com fetch timed out / no open JD URL confirmed; LinkedIn hiring posts only"
+      "issue": "careers.swiggy.com is Angular SPA shell (~5KB) with no public Greenhouse/Lever feed (swiggylife GH 404). Could not enumerate/verify open Bengaluru AI roles from official API."
+    },
+    {
+      "company": "Thoughtworks",
+      "careerPortal": "https://www.thoughtworks.com/careers",
+      "jobsFetched": 1,
+      "lastFetched": "2026-09-19",
+      "outcome": "ok",
+      "notes": "Greenhouse thoughtworks; Bangalore Solution Architect - Data & AI verified open."
+    },
+    {
+      "company": "Visa",
+      "careerPortal": "https://visa.wd5.myworkdayjobs.com/Visa",
+      "jobsFetched": 3,
+      "lastFetched": "2026-09-19",
+      "outcome": "ok",
+      "notes": "Workday CXS API: REF080421W re-verified; NEW Director REF088201W + Sr Consultant GenAI REF072167W. Junior GenAI (3-5 yrs) skipped."
     },
     {
       "company": "Walmart Global Tech",
       "careerPortal": "https://careers.walmart.com/",
       "jobsFetched": 0,
-      "lastFetched": "2026-09-18",
+      "lastFetched": "2026-09-19",
       "outcome": "zero",
-      "issue": "BuiltIn Staff Data Scientist GenAI/agentic (Bangalore) removed Jul 28 2026; no replacement verified"
+      "issue": "LinkedIn/AnitaB Staff GenAI RAG/Agentic mentions; official careers URLs 404 or US-only",
+      "notes": "No verified open India GenAI Staff/Principal on careers.walmart.com this run."
+    },
+    {
+      "company": "Wells Fargo",
+      "careerPortal": "https://wf.wd1.myworkdayjobs.com/wellsfargojobs",
+      "jobsFetched": 1,
+      "lastFetched": "2026-09-19",
+      "outcome": "ok",
+      "notes": "Workday CXS confirmed R-566518 Principal Engineer Gen AI Bengaluru still open (Posted 10 Days Ago). Broader list search intermittently HTTP 400."
     }
   ]
 }
