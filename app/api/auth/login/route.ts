@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import {
   loginWithEmailPassword,
-  loginWithSitePassword,
   setSessionCookies,
   toPublicUser,
 } from "@/lib/auth";
@@ -53,21 +52,14 @@ export async function POST(request: Request) {
     if (!emailLimit.ok) return tooMany(emailLimit.retryAfterSeconds);
   }
 
-  let result:
-    | { user: import("@/lib/types").User }
-    | { error: string; status: number };
-
-  if (email) {
-    result = await loginWithEmailPassword(email, password);
-  } else if (password) {
-    // Legacy SITE_PASSWORD → admin
-    result = await loginWithSitePassword(password);
-  } else {
+  if (!email || !password) {
     return NextResponse.json(
       { error: "email and password required" },
       { status: 400 },
     );
   }
+
+  const result = await loginWithEmailPassword(email, password);
 
   if ("error" in result) {
     return NextResponse.json(

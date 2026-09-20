@@ -41,7 +41,7 @@ On admin promote / login / `/api/me`, if `hunter:migrated:v1` is unset and globa
     (Web Crypto) and shared by `proxy.ts` and the Node route handlers.
   - Tokens are rejected when malformed, expired, signed for another uid, or signed with a different secret.
     Rotating `AUTH_SECRET` logs every tenant out. Legacy v1 (non-expiring) tokens are no longer accepted.
-- Secret: `AUTH_SECRET` or fallback `SITE_PASSWORD`.
+- Secret: `AUTH_SECRET` (deprecated fallback `SITE_PASSWORD`, kept only so old deploys without `AUTH_SECRET` keep working).
 - `proxy.ts` (Next 16 rename of `middleware.ts`) requires a valid session for everything except
   `/`, `/about`, `/pricing`, `/contact`, `/api/contact`, `/login`, `/register`, `/api/auth/login|register`, `/api/ingest/*` (bearer-auth, validates itself), `_next`, favicon/icon. Invalid or expired cookies →
   `401` JSON for `/api/*`, else redirect to `/login?from=…&reason=expired`.
@@ -71,7 +71,6 @@ Client IP comes from `x-forwarded-for` (first hop) then `x-real-ip`.
 - Called from `requireUser` (all authenticated APIs), `getMePayload` (`GET /api/me`), login, and register.
 - **Existing free accounts** with the admin email are promoted on next page load / `/api/me` without re-registering.
 - Entitlements: **unlimited companies** + **10 MB** storage + **daily** fetches + **unlimited** fetch history.
-- Legacy: POST `/api/auth/login` with `{ password }` only (SITE_PASSWORD) creates/logs into the admin user for `ADMIN_EMAIL`.
 - Bootstrap: if `ADMIN_EMAIL` + `ADMIN_BOOTSTRAP_PASSWORD` are set, first boot creates the admin user in Redis.
 
 ## Tenant isolation guarantees
@@ -163,7 +162,7 @@ Extended entitlements (Phase 2):
 | Method | Path | Notes |
 |---|---|---|
 | POST | `/api/auth/register` | `{ email, password, name, phone }` — all required; phone normalized to `+digits`, 7–15 digits; **429** when rate-limited |
-| POST | `/api/auth/login` | `{ email, password }` or legacy `{ password }`; **429** when rate-limited |
+| POST | `/api/auth/login` | `{ email, password }` (both required); **429** when rate-limited |
 | POST | `/api/auth/logout` | Clears cookies |
 | GET | `/api/me` | user + entitlements + usage + billing; **promotes admin** |
 | GET/POST/PUT/DELETE | `/api/companies` | User-scoped; enforces limits |
@@ -207,7 +206,7 @@ Helper: `scripts/publish-tenant.mjs`.
 | `AUTH_SECRET` | Prod recommended | HMAC session secret; rotating it invalidates all sessions |
 | `ADMIN_EMAIL` | Prod recommended | Defaults to hardcoded `imrn.dev@gmail.com` if unset |
 | `ADMIN_BOOTSTRAP_PASSWORD` | Optional | Seed admin on first boot |
-| `SITE_PASSWORD` | Legacy | Fallback secret + password-only admin login |
+| `SITE_PASSWORD` | Deprecated | Session-secret fallback only; password-only admin login removed |
 | `UPSTASH_REDIS_REST_URL` | Yes (multi-user) | |
 | `UPSTASH_REDIS_REST_TOKEN` | Yes (multi-user) | |
 | `HUNTER_MEMORY_REDIS` | Dev/smoke only | `1` swaps Upstash for an in-process store (`lib/memory-redis.ts`); ignored whenever `VERCEL` is set |

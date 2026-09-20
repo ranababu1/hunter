@@ -20,7 +20,7 @@ See [ARCHITECTURE-MULTIUSER.md](./ARCHITECTURE-MULTIUSER.md) for tenancy, plans,
 ```bash
 cp .env.example .env.local
 # set AUTH_SECRET, ADMIN_EMAIL=imrn.dev@gmail.com, UPSTASH_*, HUNTER_INGEST_SECRET
-# optional: ADMIN_BOOTSTRAP_PASSWORD, SITE_PASSWORD (legacy)
+# optional: ADMIN_BOOTSTRAP_PASSWORD
 
 npm install
 npm run dev
@@ -28,7 +28,7 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000). Register a free account (you will be walked through onboarding: desired roles, preferences, companies) or sign in as admin.
 
-Without `AUTH_SECRET` / `SITE_PASSWORD`, middleware allows all routes in development only (warning in logs).
+Without `AUTH_SECRET`, the proxy allows all routes in development only (warning in logs).
 
 ## Vercel environment variables
 
@@ -37,7 +37,7 @@ Without `AUTH_SECRET` / `SITE_PASSWORD`, middleware allows all routes in develop
 | `AUTH_SECRET` | Yes (prod) | Session HMAC secret |
 | `ADMIN_EMAIL` | Yes (prod) | `imrn.dev@gmail.com` — case-insensitive admin |
 | `ADMIN_BOOTSTRAP_PASSWORD` | Optional | Creates admin user on first boot |
-| `SITE_PASSWORD` | Optional | Legacy password-only admin login + secret fallback |
+| `SITE_PASSWORD` | Deprecated | Session-secret fallback only when `AUTH_SECRET` is unset; password-only login removed |
 | `UPSTASH_REDIS_REST_URL` | Yes (multi-user) | Rest URL from Upstash console |
 | `UPSTASH_REDIS_REST_TOKEN` | Yes (multi-user) | Rest token from Upstash console |
 | `HUNTER_MEMORY_REDIS` | Local only | `1` = in-process store for dev/smoke tests; ignored on Vercel |
@@ -98,7 +98,7 @@ Job fields: `id`, `company`, `role`, `level`, `aiFocus`, `location`, `postedOrUp
 ## Auth
 
 - Cookies: `hunter_uid` + `hunter_session` (httpOnly, sameSite=lax, secure in prod, 30 days)
-- Token = `v2.<exp>.<HMAC-SHA256("hunter:uid:{userId}:{exp}", AUTH_SECRET or SITE_PASSWORD)>` — expiring and uid-bound (`lib/session-token.ts`)
+- Token = `v2.<exp>.<HMAC-SHA256("hunter:uid:{userId}:{exp}", AUTH_SECRET)>` — expiring and uid-bound (`lib/session-token.ts`)
 - `proxy.ts` (Next 16 middleware) gates all non-public routes; `(app)/layout.tsx` re-checks the user exists
 - Public: `/`, `/about`, `/pricing`, `/contact`, `/api/contact`, `/login`, `/register`, `/api/auth/login`, `/api/auth/register`, `/api/ingest/*` (bearer-auth, validates itself)
 - Register requires name, email, phone (normalized to `+digits`, 7–15 digits) and an 8+ char password

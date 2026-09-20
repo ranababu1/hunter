@@ -35,6 +35,11 @@ export function getSessionCookieName() {
   return SESSION_COOKIE;
 }
 
+/**
+ * Session signing secret. `SITE_PASSWORD` remains ONLY as a deprecated
+ * fallback for deployments that never set AUTH_SECRET; the password-only
+ * admin login it once powered has been removed.
+ */
 export function getAuthSecret(): string | null {
   return process.env.AUTH_SECRET || process.env.SITE_PASSWORD || null;
 }
@@ -305,59 +310,6 @@ export async function loginWithEmailPassword(
   const ok = await verifyPassword(password, user.passwordHash);
   if (!ok) {
     return { error: "Invalid email or password", status: 401 };
-  }
-  const promoted = await ensureAdminPrivileges(user);
-  return { user: promoted };
-}
-
-/**
- * Legacy SITE_PASSWORD login → admin user tied to ADMIN_EMAIL.
- */
-export async function loginWithSitePassword(
-  password: string,
-): Promise<{ user: User } | { error: string; status: number }> {
-  const site = process.env.SITE_PASSWORD;
-  if (!site) {
-    return { error: "Legacy password login not configured", status: 401 };
-  }
-  try {
-    const a = Buffer.from(password);
-    const b = Buffer.from(site);
-    if (a.length !== b.length || !timingSafeEqual(a, b)) {
-      return { error: "Invalid password", status: 401 };
-    }
-  } catch {
-    return { error: "Invalid password", status: 401 };
-  }
-
-  const adminEmail =
-    process.env.ADMIN_EMAIL?.trim().toLowerCase() || HARDCODED_ADMIN_EMAIL;
-  if (!adminEmail) {
-    return {
-      error: "ADMIN_EMAIL required for SITE_PASSWORD login",
-      status: 503,
-    };
-  }
-
-  await ensureAdminBootstrap();
-  let user = await findUserByEmail(adminEmail);
-  if (!user) {
-    const now = new Date().toISOString();
-    const bootstrap =
-      process.env.ADMIN_BOOTSTRAP_PASSWORD || site;
-    user = {
-      id: newUserId(),
-      email: adminEmail,
-      passwordHash: await hashPassword(bootstrap),
-      name: "Admin",
-      role: "admin",
-      createdAt: now,
-      updatedAt: now,
-    };
-    const ok = await createUser(user);
-    if (!ok) {
-      return { error: "Redis required to create admin user", status: 503 };
-    }
   }
   const promoted = await ensureAdminPrivileges(user);
   return { user: promoted };
