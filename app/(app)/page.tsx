@@ -1,8 +1,4 @@
-import {
-  getAllDailyDigests,
-  getConsolidatedJobs,
-  listDailyDates,
-} from "@/lib/jobs";
+import { getDigestsPreferUser, getJobsPreferUser } from "@/lib/jobs";
 import { getAppState } from "@/lib/redis";
 import { requireUser } from "@/lib/auth";
 import { DailyView } from "@/components/DailyView";
@@ -11,19 +7,21 @@ export const dynamic = "force-dynamic";
 
 export default async function DailyPage() {
   const user = await requireUser();
-  const [dates, digests, state, allJobs] = await Promise.all([
-    listDailyDates(),
-    getAllDailyDigests(),
+  const userId = user?.id ?? null;
+  const [{ dates, digests }, state, allJobs] = await Promise.all([
+    getDigestsPreferUser(userId),
     user
       ? getAppState(user.id)
       : Promise.resolve({ visited: [] as string[], status: {} }),
-    getConsolidatedJobs(),
+    getJobsPreferUser(userId),
   ]);
 
   if (digests.length === 0) {
     return (
       <div className="glass p-10 text-center text-[var(--text-muted)]">
-        No daily digests yet. Drop a file into{" "}
+        No daily digests yet. Publish via{" "}
+        <code className="text-[var(--accent)]">POST /api/ingest/daily</code>{" "}
+        or drop a file into{" "}
         <code className="text-[var(--accent)]">data/daily/</code>.
       </div>
     );

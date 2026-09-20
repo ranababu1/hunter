@@ -5,7 +5,7 @@ import { runUserFetch } from "@/lib/fetches";
 /**
  * Start a per-user fetch (Phase 2).
  * Matches active companies against global jobs/fetches catalog — no live crawler on Vercel.
- * Morning agent will write the same FetchRun shape later.
+ * Morning ingest writes the same FetchRun shape via POST /api/ingest/daily.
  */
 export async function POST() {
   const user = await requireUser();

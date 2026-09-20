@@ -47,13 +47,15 @@ export async function computeBytesUsed(userId: string): Promise<number> {
   if (!redis) return 0;
   const keys = u(userId);
   try {
-    const [companiesRaw, profileRaw, status, visited, fetchRunsRaw] =
+    const [companiesRaw, profileRaw, status, visited, fetchRunsRaw, jobsRaw, dailyDates] =
       await Promise.all([
         redis.get<string | CompanyProfile[]>(keys.companies),
         redis.get<string | UserProfile>(keys.profile),
         redis.hgetall<Record<string, string>>(keys.status),
         redis.smembers(keys.visited),
         redis.get<string>(keys.fetchRuns),
+        redis.get<string>(keys.jobs),
+        redis.smembers(keys.dailyDates),
       ]);
     const companiesStr =
       companiesRaw == null
@@ -75,12 +77,33 @@ export async function computeBytesUsed(userId: string): Promise<number> {
         : typeof fetchRunsRaw === "string"
           ? fetchRunsRaw
           : JSON.stringify(fetchRunsRaw);
+    const jobsStr =
+      jobsRaw == null
+        ? "[]"
+        : typeof jobsRaw === "string"
+          ? jobsRaw
+          : JSON.stringify(jobsRaw);
+    let dailyBytes = 0;
+    const dates = (dailyDates as string[]) ?? [];
+    if (dates.length > 0) {
+      const digests = await Promise.all(
+        dates.map((d) => redis.get<string>(keys.daily(d))),
+      );
+      for (const raw of digests) {
+        if (raw == null) continue;
+        dailyBytes += utf8Bytes(
+          typeof raw === "string" ? raw : JSON.stringify(raw),
+        );
+      }
+    }
     return (
       utf8Bytes(companiesStr) +
       utf8Bytes(profileStr) +
       utf8Bytes(statusStr) +
       utf8Bytes(visitedStr) +
-      utf8Bytes(fetchRunsStr)
+      utf8Bytes(fetchRunsStr) +
+      utf8Bytes(jobsStr) +
+      dailyBytes
     );
   } catch (err) {
     console.warn("[hunter] computeBytesUsed failed:", err);

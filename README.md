@@ -19,7 +19,7 @@ See [ARCHITECTURE-MULTIUSER.md](./ARCHITECTURE-MULTIUSER.md) for tenancy, plans,
 
 ```bash
 cp .env.example .env.local
-# set AUTH_SECRET, ADMIN_EMAIL=imrn.dev@gmail.com, UPSTASH_*
+# set AUTH_SECRET, ADMIN_EMAIL=imrn.dev@gmail.com, UPSTASH_*, HUNTER_INGEST_SECRET
 # optional: ADMIN_BOOTSTRAP_PASSWORD, SITE_PASSWORD (legacy)
 
 npm install
@@ -40,6 +40,7 @@ Without `AUTH_SECRET` / `SITE_PASSWORD`, middleware allows all routes in develop
 | `SITE_PASSWORD` | Optional | Legacy password-only admin login + secret fallback |
 | `UPSTASH_REDIS_REST_URL` | Yes (multi-user) | Rest URL from Upstash console |
 | `UPSTASH_REDIS_REST_TOKEN` | Yes (multi-user) | Rest token from Upstash console |
+| `HUNTER_INGEST_SECRET` | Yes (morning publish) | Bearer secret for `POST /api/ingest/daily` — never commit |
 
 Without Redis, visited/status/companies mutations return 503; APIs no-op gracefully where noted.
 
@@ -54,32 +55,48 @@ Without Redis, visited/status/companies mutations return 503; APIs no-op gracefu
 
 Billing UI + `/api/billing/checkout|webhook` remain **501 stubs** (Stripe not integrated).
 
-## Daily JSON update flow
+## Daily / morning publish (per-tenant)
 
-1. Morning bot (or manual research) produces a daily digest JSON.
-2. Write `data/daily/YYYY-MM-DD.json` with shape:
+Preferred path: push digests + jobs into **one user** via ingest (admin: `imrn.dev@gmail.com`).
+
+```bash
+curl -X POST https://hunter.imrn.dev/api/ingest/daily \
+  -H "Authorization: Bearer $HUNTER_INGEST_SECRET" \
+  -H "Content-Type: application/json" \
+  -d @payload.json
+```
+
+`payload.json`:
 
 ```json
 {
-  "date": "2026-09-18",
+  "email": "imrn.dev@gmail.com",
+  "date": "2026-09-21",
   "title": "Daily digest — Bengaluru AI / GenAI",
-  "jobs": [ /* Job objects */ ]
+  "jobs": [],
+  "mergeJobs": true,
+  "fetchRun": {
+    "runDate": "2026-09-21",
+    "status": "ok",
+    "companiesChecked": 12,
+    "jobsFound": 5,
+    "companyResults": []
+  }
 }
 ```
 
-3. Merge / upsert into `data/jobs.json` (consolidated board source of truth).
-4. Commit and push — Vercel rebuilds; Daily view picks the latest `data/daily/*.json` by filename.
+- Auth: Bearer `HUNTER_INGEST_SECRET` **or** logged-in session cookie.
+- With bearer, `email` is required to target a user (defaults to `ADMIN_EMAIL` / `imrn.dev@gmail.com`); must be admin email or an existing user. Session auth ignores `email` and uses the session user.
+- Writes Redis: `hunter:u:{userId}:daily:{date}`, merges into `hunter:u:{userId}:jobs`, optional `fetchRuns` + `lastFetchDate`.
+- Helper: `node scripts/publish-tenant.mjs payload.json`
+- **Fallback:** Daily / Board / Kanban still load global `data/jobs.json` + `data/daily/*.json` when the tenant has no Redis jobs/digests yet. Global files are not removed.
 
 Job fields: `id`, `company`, `role`, `level`, `aiFocus`, `location`, `postedOrUpdated`, `match`, `url`, `whyMatch`, `dateSeen`, `isNew`.
 
-Jobs JSON remains **global**; Redis mutable state (companies, kanban, profile) is **per-user**.
-
 ## Auth
 
-- Cookies: `hunter_uid` + `hunter_session` (httpOnly, sameSite=lax, secure in prod, 30 days)
-- Token = `v2.<exp>.<HMAC-SHA256("hunter:uid:{userId}:{exp}", AUTH_SECRET or SITE_PASSWORD)>` — expiring and uid-bound (`lib/session-token.ts`)
-- `proxy.ts` (Next 16 middleware) gates all non-public routes; `(app)/layout.tsx` re-checks the user exists
-- Login/register are rate-limited per IP / email via Redis (`429` + `Retry-After`)
+- Cookies: `hunter_uid` + `hunter_session` (httpOnly, sameSite=lax)
+- Token = HMAC-SHA256 of `hunter:uid:{userId}` with `AUTH_SECRET` (or `SITE_PASSWORD`)
 - Public: `/login`, `/register`, `/api/auth/login`, `/api/auth/register`
 - Passwords: PBKDF2-SHA256 (Web Crypto)
 

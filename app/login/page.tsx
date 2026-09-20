@@ -65,12 +65,6 @@ function LoginForm() {
         Email and password access to your daily digest, board, and kanban.
       </p>
 
-      {params.get("reason") === "expired" && !error && (
-        <div className="mb-6 rounded-lg border border-[var(--border)] bg-[var(--bg-elevated)] px-3 py-2 text-xs text-[var(--text-muted)]">
-          Your session expired or is no longer valid. Please sign in again.
-        </div>
-      )}
-
       {!legacy && (
         <>
           <label className="mb-2 block text-xs font-medium tracking-wide text-[var(--text-dim)]">

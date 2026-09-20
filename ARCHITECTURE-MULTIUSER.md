@@ -19,10 +19,11 @@ All mutable Redis state is prefixed by user id:
 | `hunter:u:{userId}:billing` | BillingAccount |
 | `hunter:u:{userId}:fetchRuns` | FetchRun[] JSON (newest first; trimmed to `maxFetchHistory`) |
 | `hunter:u:{userId}:lastFetchDate` | `YYYY-MM-DD` (Asia/Calcutta) for cadence |
-| `hunter:u:{userId}:importHashes` | Recent company-import SHA-256 hashes (duplicate-import guard, max 50) |
-| `hunter:rl:{scope}:{ip|email}` | Rate-limit counters (INCR + EXPIRE), auto-expire with the window |
+| `hunter:u:{userId}:jobs` | Consolidated Job[] for that tenant |
+| `hunter:u:{userId}:daily:{YYYY-MM-DD}` | DailyDigest JSON for that IST date |
+| `hunter:u:{userId}:dailyDates` | Set of digest dates (list index) |
 
-**Global job data** (`data/jobs.json`, `data/daily/*.json`, `data/fetches.json`) remains shared — Daily / Board / Kanban still load jobs globally. `data/fetches.json` is also the **career-portal catalog** used when enriching per-user fetch results. Only Redis mutable state is per-user.
+**Job data (hybrid):** morning ingest writes per-user `jobs` + `daily:{date}` in Redis. Daily / Board / Kanban **prefer user Redis data when non-empty**, else fall back to global `data/jobs.json` / `data/daily/*.json` so empty tenants keep working. `data/fetches.json` remains the shared career-portal catalog. Global files are **not** removed yet.
 
 ### One-time migration
 
@@ -31,35 +32,12 @@ On admin promote / login / `/api/me`, if `hunter:migrated:v1` is unset and globa
 ## Auth
 
 - Register / login with email + password (PBKDF2-SHA256, 100k iterations, Web Crypto). Optional `phone` on register.
-- Session cookies (httpOnly, SameSite=lax, Secure in production, 30-day `Max-Age`):
+- Session cookies (httpOnly, SameSite=lax):
   - `hunter_uid` — user id
-  - `hunter_session` — **signed, expiring token** `v2.<expUnixSeconds>.<hmac>` where
-    `hmac = HMAC-SHA256("hunter:uid:{userId}:{exp}", secret)`; implemented once in `lib/session-token.ts`
-    (Web Crypto) and shared by `proxy.ts` and the Node route handlers.
-  - Tokens are rejected when malformed, expired, signed for another uid, or signed with a different secret.
-    Rotating `AUTH_SECRET` logs every tenant out. Legacy v1 (non-expiring) tokens are no longer accepted.
+  - `hunter_session` — HMAC-SHA256(`hunter:uid:{userId}`, secret)
 - Secret: `AUTH_SECRET` or fallback `SITE_PASSWORD`.
-- `proxy.ts` (Next 16 rename of `middleware.ts`) requires a valid session for everything except
-  `/login`, `/register`, `/api/auth/login|register`, `_next`, favicon/icon. Invalid or expired cookies →
-  `401` JSON for `/api/*`, else redirect to `/login?from=…&reason=expired`.
-- `(app)/layout.tsx` additionally calls `requireUser()` server-side: a *validly signed* cookie whose user no
-  longer exists (deleted account, wiped Redis) is redirected to `/login?reason=expired` instead of rendering
-  an empty shell. Dev soft-open still applies.
-- Dev soft-open: if neither secret is set and `NODE_ENV !== production`, routes are allowed with a warning
-  and the unsigned `dev:{userId}` marker is accepted.
-
-### Rate limiting (`lib/rate-limit.ts`)
-
-Fixed-window counters in Redis (`INCR` + `EXPIRE`), **fail-open** when Redis is unavailable.
-
-| Route | Key | Limit |
-|---|---|---|
-| `POST /api/auth/login` | per IP | 20 / 15 min |
-| `POST /api/auth/login` | per email | 10 / 15 min |
-| `POST /api/auth/register` | per IP | 5 / hour |
-
-Over the limit → `429` `{ error: "<human message>", code: "RATE_LIMITED", retryAfterSeconds }` + `Retry-After` header.
-Client IP comes from `x-forwarded-for` (first hop) then `x-real-ip`.
+- Middleware requires a valid session (except `/login`, `/register`, `/api/auth/*`, `/api/ingest/*`).
+- Dev soft-open: if neither secret is set and `NODE_ENV !== production`, routes are allowed with a warning.
 
 ### Admin (promote-on-me)
 
@@ -70,17 +48,6 @@ Client IP comes from `x-forwarded-for` (first hop) then `x-real-ip`.
 - Entitlements: **unlimited companies** + **10 MB** storage + **daily** fetches + **unlimited** fetch history.
 - Legacy: POST `/api/auth/login` with `{ password }` only (SITE_PASSWORD) creates/logs into the admin user for `ADMIN_EMAIL`.
 - Bootstrap: if `ADMIN_EMAIL` + `ADMIN_BOOTSTRAP_PASSWORD` are set, first boot creates the admin user in Redis.
-
-## Tenant isolation guarantees
-
-1. **Every** authenticated route handler and server page resolves the tenant from the session via
-   `requireUser()` and reads/writes only `hunter:u:{user.id}:*`. No handler accepts a user id from the request.
-2. Admin-only data (`/api/admin/users`, `/users`) is gated by `resolveEntitlements(...).isAdmin`, i.e. the
-   `role` stored on the user record, never by a client-supplied flag.
-3. In-memory cache keys are always `u:{userId}:{part}` (see *Caching model*), so one instance cannot serve
-   another tenant's entry.
-4. Global, read-only job data (`data/*.json`) is intentionally shared; nothing tenant-specific is written there.
-5. Sessions are bound to a uid *and* an expiry; a leaked cookie is useless for another uid and dies after 30 days.
 
 ## Plans / entitlements
 
@@ -121,7 +88,7 @@ Extended entitlements (Phase 2):
 
 - Company add when `count >= maxCompanies` → `402` `{ error: 'PLAN_LIMIT', kind: 'companies', limit, used }`
 - Writes that would exceed storage → `402` `{ error: 'QUOTA_EXCEEDED', kind: 'storage', limit, used }` with message *Free tier maxxed out. Continue for $10/mo*
-- `bytesUsed` ≈ UTF-8 length of companies + profile + status + visited + fetchRuns JSON; recomputed on each write.
+- `bytesUsed` ≈ UTF-8 length of companies + profile + status + visited + fetchRuns + jobs + daily digests JSON; recomputed on each write.
 - Fetch history trimmed to `maxFetchHistory` (30 for free).
 
 ## Per-user fetches (Phase 2)
@@ -129,7 +96,7 @@ Extended entitlements (Phase 2):
 - Redis `hunter:u:{userId}:fetchRuns` — `FetchRun[]` newest first.
 - `FetchRun`: `{ id, runDate, createdAt, status, cadenceApplied, companiesChecked, jobsFound, notes?, issue?, source?, companyResults }`.
 - `POST /api/fetches/run` matches the user’s **active** companies + profile targetRoles / resume keywords against global `data/jobs.json` + portal metadata from `data/fetches.json` (honest source: `catalog` / `seed`). No external crawler on Vercel.
-- Morning agent will write the **same FetchRun shape** later.
+- Morning agent / `POST /api/ingest/daily` writes the **same FetchRun shape** (optional `fetchRun` in body).
 - `GET /api/fetches` returns runs + cadence info + `nextEligibleDate`; empty history falls back to seed snapshot.
 
 ## Admin Users
@@ -143,8 +110,8 @@ Extended entitlements (Phase 2):
 
 | Method | Path | Notes |
 |---|---|---|
-| POST | `/api/auth/register` | `{ email, password, name?, phone? }`; **429** when rate-limited |
-| POST | `/api/auth/login` | `{ email, password }` or legacy `{ password }`; **429** when rate-limited |
+| POST | `/api/auth/register` | `{ email, password, name?, phone? }` |
+| POST | `/api/auth/login` | `{ email, password }` or legacy `{ password }` |
 | POST | `/api/auth/logout` | Clears cookies |
 | GET | `/api/me` | user + entitlements + usage + billing; **promotes admin** |
 | GET/POST/PUT/DELETE | `/api/companies` | User-scoped; enforces limits |
@@ -157,6 +124,20 @@ Extended entitlements (Phase 2):
 | POST | `/api/billing/checkout` | **501** stub (Stripe not integrated) |
 | POST | `/api/billing/webhook` | **501** stub |
 
+
+## Morning ingest (`POST /api/ingest/daily`)
+
+Auth (either):
+
+1. Session cookie (logged-in user) — body `email` ignored.
+2. `Authorization: Bearer ${HUNTER_INGEST_SECRET}` + target `email` (body or `X-Hunter-Email`; default `ADMIN_EMAIL` / `imrn.dev@gmail.com`). Email must be the admin address or an existing user.
+
+Body: `{ email?, date, title?, jobs: Job[], fetchRun?, mergeJobs? }` (`mergeJobs` default `true`).
+
+Behavior: save `hunter:u:{id}:daily:{date}`; merge jobs into `hunter:u:{id}:jobs` by id (newer wins); optionally prepend `fetchRun` (respect `maxFetchHistory`); set `lastFetchDate`; `invalidateUser`; return `{ ok, userId, jobCount, dailyCount, fetchRunsCount }`.
+
+Helper: `scripts/publish-tenant.mjs`.
+
 ## Stripe (still stubbed — not Phase 2)
 
 1. Replace checkout stub: create Stripe Checkout Session from `planId`, set `stripeCustomerId` / `stripeSubscriptionId` / `stripePriceIds` on `billing`.
@@ -168,12 +149,13 @@ Extended entitlements (Phase 2):
 
 | Variable | Required | Notes |
 |---|---|---|
-| `AUTH_SECRET` | Prod recommended | HMAC session secret; rotating it invalidates all sessions |
+| `AUTH_SECRET` | Prod recommended | HMAC session secret |
 | `ADMIN_EMAIL` | Prod recommended | Defaults to hardcoded `imrn.dev@gmail.com` if unset |
 | `ADMIN_BOOTSTRAP_PASSWORD` | Optional | Seed admin on first boot |
 | `SITE_PASSWORD` | Legacy | Fallback secret + password-only admin login |
 | `UPSTASH_REDIS_REST_URL` | Yes (multi-user) | |
 | `UPSTASH_REDIS_REST_TOKEN` | Yes (multi-user) | |
+| `HUNTER_INGEST_SECRET` | Morning publish | Bearer for `/api/ingest/daily` — never commit |
 
 
 ## Caching model (process-local)
@@ -191,7 +173,7 @@ In-memory cache in `lib/cache.ts` (Map + short TTL + simple LRU cap of 500 entri
 
 | Data | Key pattern | TTL |
 |---|---|---|
-| User / billing / usage / profile / companies / appState / fetchRuns / lastFetchDate | `u:{userId}:*` | **20s** |
+| User / billing / usage / profile / companies / appState / fetchRuns / lastFetchDate / jobs / digests | `u:{userId}:*` | **20s** |
 | Assembled `GET /api/me` payload | `u:{userId}:me` | **8s** |
 | Static files (`jobs.json`, digests, `fetches.json`, daily dates) | `static:jobs:*` | **90s** |
 
@@ -205,8 +187,7 @@ GET `/api/me`, `/api/companies`, `/api/fetches` set `Cache-Control: private, max
 
 ## Later
 
-- Live career-portal crawler / morning agent writing FetchRun
+- Live career-portal crawler (ingest path already live)
 - True PDF parsing quality
 - Stripe SDK + live checkout
-- Email verification / password reset
-- Server-side session store (revocation before expiry) if needed
+- Email verification

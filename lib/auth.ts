@@ -1,4 +1,4 @@
-import { timingSafeEqual } from "crypto";
+import { createHmac, timingSafeEqual } from "crypto";
 import { newUserId } from "./auth-id";
 import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
@@ -20,11 +20,6 @@ import {
   resolveEntitlements,
 } from "./plans";
 import type { PublicUser, User } from "./types";
-import {
-  SESSION_TTL_SECONDS,
-  createSessionToken,
-  verifySessionToken as verifyToken,
-} from "./session-token";
 
 export const UID_COOKIE = "hunter_uid";
 export const SESSION_COOKIE = "hunter_session";
@@ -82,20 +77,70 @@ export async function ensureAdminPrivileges(user: User): Promise<User> {
   return user;
 }
 
-/**
- * Mint a signed, expiring session token (`v2.<exp>.<hmac>`) for userId.
- * Dev fallback without a secret: unsigned `dev:{userId}` marker.
- */
-export async function signSession(userId: string): Promise<string> {
-  return createSessionToken(userId, getAuthSecret(), SESSION_TTL_SECONDS);
+/** HMAC-SHA256 hex of message with auth secret (Node). */
+export function signSession(userId: string): string {
+  const secret = getAuthSecret();
+  if (!secret) {
+    // Dev fallback: unsigned marker (middleware also soft-allows)
+    return `dev:${userId}`;
+  }
+  return createHmac("sha256", secret)
+    .update(`hunter:uid:${userId}`)
+    .digest("hex");
 }
 
-/** Verify uid + token cookie pair: well-formed, unexpired, correctly signed. */
-export async function verifySessionToken(
+export function verifySessionToken(
   userId: string | undefined,
   token: string | undefined,
+): boolean {
+  if (!userId || !token) return false;
+  const secret = getAuthSecret();
+  if (!secret) {
+    return token === `dev:${userId}`;
+  }
+  const expected = signSession(userId);
+  try {
+    const a = Buffer.from(token);
+    const b = Buffer.from(expected);
+    if (a.length !== b.length) return false;
+    return timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
+}
+
+/** Edge-compatible verify used by middleware (Web Crypto). */
+export async function verifySessionEdge(
+  userId: string | undefined,
+  token: string | undefined,
+  secret: string | null,
 ): Promise<boolean> {
-  return verifyToken(userId, token, getAuthSecret());
+  if (!userId || !token) return false;
+  if (!secret) {
+    return token === `dev:${userId}`;
+  }
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const sig = await crypto.subtle.sign(
+    "HMAC",
+    key,
+    enc.encode(`hunter:uid:${userId}`),
+  );
+  const expected = Array.from(new Uint8Array(sig))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  if (expected.length !== token.length) return false;
+  let out = 0;
+  for (let i = 0; i < expected.length; i++) {
+    out |= expected.charCodeAt(i) ^ token.charCodeAt(i);
+  }
+  return out === 0;
 }
 
 export function toPublicUser(u: User): PublicUser {
@@ -119,9 +164,7 @@ export type SessionCookieOptions = {
   maxAge: number;
 };
 
-export function sessionCookieOptions(
-  maxAge: number = SESSION_TTL_SECONDS,
-): SessionCookieOptions {
+export function sessionCookieOptions(maxAge = 60 * 60 * 24 * 30): SessionCookieOptions {
   return {
     httpOnly: true,
     sameSite: "lax",
@@ -138,7 +181,7 @@ export async function setSessionCookies(
 ) {
   const opts = sessionCookieOptions();
   res.cookies.set(UID_COOKIE, userId, opts);
-  res.cookies.set(SESSION_COOKIE, await signSession(userId), opts);
+  res.cookies.set(SESSION_COOKIE, signSession(userId), opts);
 }
 
 export async function clearSessionCookies(
@@ -155,7 +198,7 @@ export async function getSessionUserId(): Promise<string | null> {
   const jar = await cookies();
   const uid = jar.get(UID_COOKIE)?.value;
   const token = jar.get(SESSION_COOKIE)?.value;
-  if (!(await verifySessionToken(uid, token))) return null;
+  if (!verifySessionToken(uid, token)) return null;
   return uid ?? null;
 }
 
@@ -323,11 +366,35 @@ export async function loginWithSitePassword(
 }
 
 /** Request helper: parse uid+session from NextRequest cookies. */
-export async function sessionFromRequest(
-  req: NextRequest,
-): Promise<string | null> {
+export function sessionFromRequest(req: NextRequest): string | null {
   const uid = req.cookies.get(UID_COOKIE)?.value;
   const token = req.cookies.get(SESSION_COOKIE)?.value;
-  if (!(await verifySessionToken(uid, token))) return null;
+  if (!verifySessionToken(uid, token)) return null;
   return uid ?? null;
+}
+
+// Keep old helpers for any leftover imports during transition
+export function createSessionToken(password: string): string {
+  return createHmac("sha256", password)
+    .update(`hunter:${password}`)
+    .digest("hex");
+}
+
+export function checkPassword(password: string): boolean {
+  const expected = process.env.SITE_PASSWORD;
+  if (!expected) return false;
+  try {
+    const a = Buffer.from(password);
+    const b = Buffer.from(expected);
+    if (a.length !== b.length) return false;
+    return timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
+}
+
+export function verifySession(token: string | undefined): boolean {
+  // Legacy no-op — prefer verifySessionToken
+  if (!token) return false;
+  return false;
 }

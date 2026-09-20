@@ -6,7 +6,7 @@ import type {
   Job,
   UserProfile,
 } from "./types";
-import { getConsolidatedJobs, getFetchesSnapshot } from "./jobs";
+import { getJobsPreferUser, getFetchesSnapshot } from "./jobs";
 import { getCompanies } from "./redis";
 import {
   getBilling,
@@ -65,8 +65,8 @@ function jobMatchesKeywords(job: Job, keywords: string[]): boolean {
 
 /**
  * Phase 2 fetch without external crawler: match user's active companies
- * against global data/jobs.json + data/fetches.json (catalog/seed).
- * Morning agent will write the same FetchRun shape later.
+ * against per-user jobs (fallback global data/jobs.json) + data/fetches.json catalog.
+ * Morning ingest (POST /api/ingest/daily) writes the same FetchRun shape.
  */
 export async function runUserFetch(user: User): Promise<
   | { ok: true; run: FetchRun; nextEligibleDate: string }
@@ -106,7 +106,7 @@ export async function runUserFetch(user: User): Promise<
   let jobs: Job[] = [];
   let catalog: Awaited<ReturnType<typeof getFetchesSnapshot>> = null;
   try {
-    jobs = await getConsolidatedJobs();
+    jobs = await getJobsPreferUser(user.id);
   } catch {
     jobs = [];
   }

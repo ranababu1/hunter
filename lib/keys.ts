@@ -24,5 +24,11 @@ export function u(userId: string) {
     fetchRuns: `hunter:u:${userId}:fetchRuns`,
     lastFetchDate: `hunter:u:${userId}:lastFetchDate`,
     importHashes: `hunter:u:${userId}:importHashes`,
+    /** Consolidated Job[] for this tenant */
+    jobs: `hunter:u:${userId}:jobs`,
+    /** DailyDigest JSON for one IST date */
+    daily: (date: string) => `hunter:u:${userId}:daily:${date}`,
+    /** Set of YYYY-MM-DD dates that have digests (list index) */
+    dailyDates: `hunter:u:${userId}:dailyDates`,
   };
 }
