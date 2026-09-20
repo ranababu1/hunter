@@ -95,9 +95,12 @@ Job fields: `id`, `company`, `role`, `level`, `aiFocus`, `location`, `postedOrUp
 
 ## Auth
 
-- Cookies: `hunter_uid` + `hunter_session` (httpOnly, sameSite=lax)
-- Token = HMAC-SHA256 of `hunter:uid:{userId}` with `AUTH_SECRET` (or `SITE_PASSWORD`)
-- Public: `/login`, `/register`, `/api/auth/login`, `/api/auth/register`
+- Cookies: `hunter_uid` + `hunter_session` (httpOnly, sameSite=lax, secure in prod, 30 days)
+- Token = `v2.<exp>.<HMAC-SHA256("hunter:uid:{userId}:{exp}", AUTH_SECRET or SITE_PASSWORD)>` — expiring and uid-bound (`lib/session-token.ts`)
+- `proxy.ts` (Next 16 middleware) gates all non-public routes; `(app)/layout.tsx` re-checks the user exists
+- Public: `/login`, `/register`, `/api/auth/login`, `/api/auth/register`, `/api/ingest/*` (bearer-auth, validates itself)
+- Register requires name, email, phone (normalized to `+digits`, 7–15 digits) and an 8+ char password
+- Login/register are rate-limited per IP / email via Redis (`429` + `Retry-After`)
 - Passwords: PBKDF2-SHA256 (Web Crypto)
 
 ## Scripts
