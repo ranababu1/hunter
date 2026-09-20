@@ -5,6 +5,8 @@ export const GLOBAL = {
   visited: "hunter:visited",
   status: "hunter:status",
   migrated: "hunter:migrated:v1",
+  /** One-time copy of data/*.json seed files into the admin tenant */
+  migratedJobs: "hunter:migrated:jobs:v1",
   usersByEmail: "hunter:users:byEmail",
   userIds: "hunter:users:ids",
 } as const;

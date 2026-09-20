@@ -8,13 +8,13 @@ All mutable Redis state is prefixed by user id:
 
 | Key | Contents |
 |---|---|
-| `hunter:user:{id}` | User JSON (email, passwordHash, role, phone?, …) |
+| `hunter:user:{id}` | User JSON (email, passwordHash, role, phone, onboardingCompletedAt?, …) |
 | `hunter:users:byEmail` | Hash email → userId |
 | `hunter:users:ids` | Set of user ids (admin Users table; backfilled from byEmail if empty) |
 | `hunter:u:{userId}:companies` | CompanyProfile[] JSON |
 | `hunter:u:{userId}:visited` | Set of job ids |
 | `hunter:u:{userId}:status` | Hash jobId → KanbanStatus |
-| `hunter:u:{userId}:profile` | UserProfile (resumeText, targetRoles, phone?, …) |
+| `hunter:u:{userId}:profile` | UserProfile (resumeText, targetRoles, locations?, experienceLevel?, phone?, …) |
 | `hunter:u:{userId}:usage` | `{ bytesUsed, updatedAt }` |
 | `hunter:u:{userId}:billing` | BillingAccount |
 | `hunter:u:{userId}:fetchRuns` | FetchRun[] JSON (newest first; trimmed to `maxFetchHistory`) |
@@ -23,8 +23,9 @@ All mutable Redis state is prefixed by user id:
 | `hunter:u:{userId}:jobs` | Consolidated Job[] for that tenant |
 | `hunter:u:{userId}:daily:{YYYY-MM-DD}` | DailyDigest JSON for that IST date |
 | `hunter:u:{userId}:dailyDates` | Set of digest dates (list index) |
+| `hunter:migrated:jobs:v1` | Flag: seed `data/*.json` copied into the admin tenant |
 
-**Job data (hybrid):** morning ingest writes per-user `jobs` + `daily:{date}` in Redis. Daily / Board / Kanban **prefer user Redis data when non-empty**, else fall back to global `data/jobs.json` / `data/daily/*.json` so empty tenants keep working. `data/fetches.json` remains the shared career-portal catalog. Global files are **not** removed yet.
+**Job data is strictly per tenant.** Daily / Board / Kanban / Fetches read only `hunter:u:{userId}:jobs`, `daily:{date}` and `fetchRuns`. There is **no fallback to `data/*.json`** for any user: a brand-new tenant sees an empty feed (`components/EmptyFeed.tsx`) until the morning ingest writes into *their* keys. The legacy files under `data/` are the owner's historical seed; `maybeMigrateSeedJobsToUser` copies them into the **admin** tenant once (`hunter:migrated:jobs:v1`), preferring already-ingested Redis jobs on id collisions, and turns `data/fetches.json` into a single `source: "seed"` FetchRun if the admin has no runs. Nothing else reads those files.
 
 ### One-time migration
 
@@ -83,6 +84,14 @@ Client IP comes from `x-forwarded-for` (first hop) then `x-real-ip`.
    another tenant's entry.
 4. Global, read-only job data (`data/*.json`) is intentionally shared; nothing tenant-specific is written there.
 5. Sessions are bound to a uid *and* an expiry; a leaked cookie is useless for another uid and dies after 30 days.
+
+## Onboarding (blank-slate tenants)
+
+- `User.onboardingCompletedAt` gates the app. `isOnboarded(user)` is true for admin or any user with the stamp.
+- Register → `/onboarding` (standalone page, no app shell). Wizard steps: **Roles** (≥1) → **Preferences** (locations, experience level, optional resume text) → **Companies** (≥1, capped at `maxCompanies`) → **Review** → `POST /api/onboarding`.
+- `(app)/layout.tsx` redirects un-onboarded tenants to `/onboarding`. Accounts that pre-date onboarding are grandfathered: if they already have companies or target roles the stamp is written lazily instead of redirecting.
+- `/onboarding` itself redirects completed users to `/`.
+- The wizard writes only to the caller's keys; company limit and storage quota return `402` with `field` so the UI can jump to the offending step.
 
 ## Plans / entitlements
 
@@ -151,9 +160,10 @@ Extended entitlements (Phase 2):
 | GET | `/api/me` | user + entitlements + usage + billing; **promotes admin** |
 | GET/POST/PUT/DELETE | `/api/companies` | User-scoped; enforces limits |
 | GET/PATCH | `/api/state` | User-scoped visited/status |
-| GET/PUT | `/api/profile` | Resume + target roles + phone/name |
-| GET | `/api/fetches` | Per-user runs + cadence + seed fallback |
-| POST | `/api/fetches/run` | Cadence-enforced catalog match fetch |
+| GET/PUT | `/api/profile` | Resume + target roles + locations + experience level + phone/name |
+| GET/POST | `/api/onboarding` | GET status + plan limits; POST `{ targetRoles, locations?, experienceLevel?, resumeText?, companies:[{name, careersUrl?}] }` → saves profile + companies (plan/quota enforced), stamps `onboardingCompletedAt` |
+| GET | `/api/fetches` | Per-user runs + cadence (no seed fallback) |
+| POST | `/api/fetches/run` | Cadence-enforced match of the tenant's active companies against the tenant's own jobs |
 | GET | `/api/admin/users` | Admin-only user table |
 | GET | `/api/billing/plans` | Catalog JSON |
 | POST | `/api/billing/checkout` | **501** stub (Stripe not integrated) |
@@ -190,12 +200,13 @@ Helper: `scripts/publish-tenant.mjs`.
 | `SITE_PASSWORD` | Legacy | Fallback secret + password-only admin login |
 | `UPSTASH_REDIS_REST_URL` | Yes (multi-user) | |
 | `UPSTASH_REDIS_REST_TOKEN` | Yes (multi-user) | |
+| `HUNTER_MEMORY_REDIS` | Dev/smoke only | `1` swaps Upstash for an in-process store (`lib/memory-redis.ts`); ignored whenever `VERCEL` is set |
 | `HUNTER_INGEST_SECRET` | Morning publish | Bearer for `/api/ingest/daily` — never commit |
 
 
 ## Caching model (process-local)
 
-In-memory cache in `lib/cache.ts` (Map + short TTL + simple LRU cap of 500 entries). **Not** a Redis second layer — Redis remains the source of truth for mutable user data.
+In-memory cache in `lib/cache.ts` (Map + short TTL + simple LRU cap of 500 entries). The Map lives on `globalThis` because Next bundles pages and route handlers separately; without that, a mutation in `/api/*` could not invalidate the copy a page render reads (e.g. the layout would keep redirecting to `/onboarding` for up to 20s after completion). **Not** a Redis second layer — Redis remains the source of truth for mutable user data.
 
 ### Integrity guarantees
 
@@ -222,7 +233,8 @@ GET `/api/me`, `/api/companies`, `/api/fetches` set `Cache-Control: private, max
 
 ## Later
 
-- Live career-portal crawler (ingest path already live)
+- Live career-portal crawler per tenant (ingest path already live; free tenants get nothing until it runs for them)
+- Remove `data/*.json` once the admin migration flag is confirmed set in prod
 - True PDF parsing quality
 - Stripe SDK + live checkout
 - Email verification

@@ -198,6 +198,8 @@ export interface User {
   role: UserRole;
   createdAt: string;
   updatedAt: string;
+  /** ISO timestamp once the tenant finished onboarding (roles + companies). */
+  onboardingCompletedAt?: string;
 }
 
 /** Public user shape (no password hash). */
@@ -208,6 +210,7 @@ export interface PublicUser {
   phone?: string;
   role: UserRole;
   createdAt: string;
+  onboardingCompletedAt?: string;
 }
 
 export type FetchCadence = "daily" | "alternate";
@@ -250,12 +253,25 @@ export interface ResumeMeta {
   charCount?: number;
 }
 
+export const EXPERIENCE_LEVELS = [
+  { id: "junior", label: "Junior (0–3 yrs)" },
+  { id: "mid", label: "Mid (3–6 yrs)" },
+  { id: "senior", label: "Senior (6–10 yrs)" },
+  { id: "staff", label: "Staff / Principal (10+ yrs)" },
+  { id: "leadership", label: "Leadership (EM / Director+)" },
+] as const;
+
+export type ExperienceLevel = (typeof EXPERIENCE_LEVELS)[number]["id"];
+
 export interface UserProfile {
   displayName: string;
   phone?: string;
   resumeText: string;
   resumeMeta: ResumeMeta;
   targetRoles: TargetRole[];
+  /** Preferred locations, e.g. "Bengaluru", "Remote" */
+  locations?: string[];
+  experienceLevel?: ExperienceLevel;
   updatedAt: string;
 }
 

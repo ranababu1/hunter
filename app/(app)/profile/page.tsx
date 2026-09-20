@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { Plus, X, Upload } from "lucide-react";
 import type { TargetRole, UserProfile } from "@/lib/types";
+import { EXPERIENCE_LEVELS } from "@/lib/types";
 import { QuotaBanner } from "@/components/QuotaBanner";
 import { useMe } from "@/components/MeProvider";
 
@@ -11,6 +12,9 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [displayName, setDisplayName] = useState("");
   const [phone, setPhone] = useState("");
+  const [locations, setLocations] = useState<string[]>([]);
+  const [locationInput, setLocationInput] = useState("");
+  const [level, setLevel] = useState("");
   const [resumeText, setResumeText] = useState("");
   const [roles, setRoles] = useState<TargetRole[]>([]);
   const [roleInput, setRoleInput] = useState("");
@@ -32,6 +36,8 @@ export default function ProfilePage() {
         setPhone(data.profile.phone || data.user?.phone || "");
         setResumeText(data.profile.resumeText ?? "");
         setRoles(data.profile.targetRoles ?? []);
+        setLocations(data.profile.locations ?? []);
+        setLevel(data.profile.experienceLevel ?? "");
       }
       setError(null);
     } catch {
@@ -93,6 +99,8 @@ export default function ProfilePage() {
           phone,
           resumeText,
           targetRoles: roles,
+          locations,
+          experienceLevel: level || null,
           resumeMeta: profile?.resumeMeta?.fileName
             ? profile.resumeMeta
             : {
@@ -247,6 +255,83 @@ export default function ProfilePage() {
             </button>
           </div>
         </div>
+
+        <div className="space-y-2">
+          <span className="eyebrow">Preferred locations</span>
+          <div className="flex flex-wrap gap-2">
+            {locations.map((loc) => (
+              <span
+                key={loc}
+                className="inline-flex items-center gap-1 rounded-full border border-[rgba(45,212,191,0.35)] bg-[var(--accent-soft)] px-2.5 py-1 text-xs text-[var(--accent)]"
+              >
+                {loc}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setLocations(locations.filter((l) => l !== loc))
+                  }
+                  className="opacity-70 hover:opacity-100"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <input
+              value={locationInput}
+              onChange={(e) => setLocationInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  const v = locationInput.trim();
+                  if (
+                    v &&
+                    !locations.some((l) => l.toLowerCase() === v.toLowerCase())
+                  ) {
+                    setLocations([...locations, v].slice(0, 10));
+                  }
+                  setLocationInput("");
+                }
+              }}
+              placeholder="e.g. Bengaluru, Remote"
+              className="flex-1 rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                const v = locationInput.trim();
+                if (
+                  v &&
+                  !locations.some((l) => l.toLowerCase() === v.toLowerCase())
+                ) {
+                  setLocations([...locations, v].slice(0, 10));
+                }
+                setLocationInput("");
+              }}
+              className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] px-3 py-2 text-sm text-[var(--text-muted)] hover:text-[var(--text)]"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add
+            </button>
+          </div>
+        </div>
+
+        <label className="block space-y-1.5">
+          <span className="eyebrow">Experience level</span>
+          <select
+            value={level}
+            onChange={(e) => setLevel(e.target.value)}
+            className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 py-2 text-sm outline-none focus:border-[var(--accent)]"
+          >
+            <option value="">Prefer not to say</option>
+            {EXPERIENCE_LEVELS.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.label}
+              </option>
+            ))}
+          </select>
+        </label>
 
         {error && <p className="text-sm text-[var(--danger)]">{error}</p>}
         {message && <p className="text-sm text-[var(--strong)]">{message}</p>}

@@ -35,7 +35,7 @@ export default function RegisterPage() {
         setLoading(false);
         return;
       }
-      router.replace("/");
+      router.replace("/onboarding");
       router.refresh();
     } catch {
       setError("Something went wrong.");

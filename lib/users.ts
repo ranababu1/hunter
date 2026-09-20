@@ -1,4 +1,5 @@
 import { Redis } from "@upstash/redis";
+import { getMemoryRedis, memoryRedisEnabled } from "./memory-redis";
 import { hashPassword } from "./password";
 import { GLOBAL, u, userKey } from "./keys";
 import { adminBilling, DEFAULT_BILLING } from "./plans";
@@ -22,6 +23,10 @@ import type {
 } from "./types";
 
 export function getRedis(): Redis | null {
+  // Local dev / smoke tests only — hard-disabled when VERCEL is set.
+  if (memoryRedisEnabled()) {
+    return getMemoryRedis() as unknown as Redis;
+  }
   const url = process.env.UPSTASH_REDIS_REST_URL;
   const token = process.env.UPSTASH_REDIS_REST_TOKEN;
   if (!url || !token) return null;
@@ -410,6 +415,19 @@ export async function updateUserFields(
     user.phone = p || undefined;
   }
   user.updatedAt = new Date().toISOString();
+  const ok = await createUser(user);
+  return ok ? user : null;
+}
+
+/** Stamp onboardingCompletedAt on the user record (idempotent). */
+export async function markOnboardingComplete(
+  userId: string,
+): Promise<User | null> {
+  const user = await getUserById(userId);
+  if (!user) return null;
+  if (user.onboardingCompletedAt) return user;
+  user.onboardingCompletedAt = new Date().toISOString();
+  user.updatedAt = user.onboardingCompletedAt;
   const ok = await createUser(user);
   return ok ? user : null;
 }

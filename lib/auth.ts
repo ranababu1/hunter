@@ -25,6 +25,7 @@ import {
   createSessionToken,
   verifySessionToken as verifyToken,
 } from "./session-token";
+import { maybeMigrateSeedJobsToUser } from "./jobs";
 
 export const UID_COOKIE = "hunter_uid";
 export const SESSION_COOKIE = "hunter_session";
@@ -64,6 +65,12 @@ export async function ensureAdminPrivileges(user: User): Promise<User> {
     user.updatedAt = new Date().toISOString();
     changed = true;
   }
+  // The owner account never sees the onboarding wizard.
+  if (!user.onboardingCompletedAt) {
+    user.onboardingCompletedAt = new Date().toISOString();
+    user.updatedAt = user.onboardingCompletedAt;
+    changed = true;
+  }
   if (changed) {
     await createUser(user); // upsert — invalidates user cache
   }
@@ -79,7 +86,13 @@ export async function ensureAdminPrivileges(user: User): Promise<User> {
     await setBilling(user.id, desired);
   }
   await maybeMigrateGlobalData(user.id);
+  await maybeMigrateSeedJobsToUser(user.id);
   return user;
+}
+
+/** Tenants must finish onboarding before the app renders; admin is exempt. */
+export function isOnboarded(user: User): boolean {
+  return user.role === "admin" || Boolean(user.onboardingCompletedAt);
 }
 
 /**
@@ -106,6 +119,7 @@ export function toPublicUser(u: User): PublicUser {
     phone: u.phone,
     role: u.role,
     createdAt: u.createdAt,
+    onboardingCompletedAt: u.onboardingCompletedAt,
   };
 }
 
