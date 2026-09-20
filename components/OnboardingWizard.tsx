@@ -261,7 +261,7 @@ export function OnboardingWizard({ userName }: { userName: string }) {
         setSaving(false);
         return;
       }
-      router.replace("/");
+      router.replace("/daily");
       router.refresh();
     } catch {
       setError("Network error. Please try again.");

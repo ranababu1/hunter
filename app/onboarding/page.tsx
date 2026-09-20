@@ -20,7 +20,7 @@ export default async function OnboardingPage() {
       </main>
     );
   }
-  if (isOnboarded(user)) redirect("/");
+  if (isOnboarded(user)) redirect("/daily");
 
   return (
     <main className="relative flex min-h-screen items-start justify-center px-4 py-10 sm:py-16">

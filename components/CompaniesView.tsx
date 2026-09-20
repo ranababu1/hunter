@@ -681,7 +681,7 @@ export function CompaniesView() {
           <div className="eyebrow mb-2">Targets</div>
           <h1 className="prose-title text-3xl sm:text-4xl">Companies</h1>
           <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
-            Track valuation, headcount, Bengaluru office areas, and fetch
+            Track valuation, headcount, office locations, and fetch
             priority. Edits persist in Redis.
           </p>
         </div>

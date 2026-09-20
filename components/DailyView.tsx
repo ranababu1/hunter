@@ -115,7 +115,7 @@ export function DailyView({
           <div className="eyebrow mb-2">Daily digest · {date}</div>
           <h1 className="prose-title text-3xl sm:text-4xl">{title}</h1>
           <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[var(--text-muted)]">
-            Morning briefing of Bengaluru AI / GenAI roles. Open a card for
+            Morning briefing of new roles from the companies you watch. Open a card for
             detail, mark visited, and move into your pipeline.
           </p>
         </div>
