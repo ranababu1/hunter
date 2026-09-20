@@ -1,32 +1,40 @@
-import { getDigestsPreferUser, getJobsPreferUser } from "@/lib/jobs";
-import { getAppState } from "@/lib/redis";
+import { getUserDailyDigests, getUserJobs } from "@/lib/jobs";
+import { getAppState, getCompanies } from "@/lib/redis";
+import { getProfile } from "@/lib/users";
 import { requireUser } from "@/lib/auth";
 import { DailyView } from "@/components/DailyView";
+import { EmptyFeed } from "@/components/EmptyFeed";
 
 export const dynamic = "force-dynamic";
 
+/** Daily feed — strictly this tenant's ingested digests. */
 export default async function DailyPage() {
   const user = await requireUser();
-  const userId = user?.id ?? null;
-  const [{ dates, digests }, state, allJobs] = await Promise.all([
-    getDigestsPreferUser(userId),
-    user
-      ? getAppState(user.id)
-      : Promise.resolve({ visited: [] as string[], status: {} }),
-    getJobsPreferUser(userId),
+  if (!user) {
+    return <EmptyFeed roles={[]} companiesCount={0} jobsCount={0} />;
+  }
+
+  const [digests, state, allJobs] = await Promise.all([
+    getUserDailyDigests(user.id),
+    getAppState(user.id),
+    getUserJobs(user.id),
   ]);
 
   if (digests.length === 0) {
+    const [profile, { companies }] = await Promise.all([
+      getProfile(user.id),
+      getCompanies(user.id),
+    ]);
     return (
-      <div className="glass p-10 text-center text-[var(--text-muted)]">
-        No daily digests yet. Publish via{" "}
-        <code className="text-[var(--accent)]">POST /api/ingest/daily</code>{" "}
-        or drop a file into{" "}
-        <code className="text-[var(--accent)]">data/daily/</code>.
-      </div>
+      <EmptyFeed
+        roles={profile.targetRoles.map((r) => r.label)}
+        companiesCount={companies.filter((c) => c.active).length}
+        jobsCount={allJobs.length}
+      />
     );
   }
 
+  const dates = digests.map((d) => d.date);
   const initialDate = dates[0] ?? digests[0].date;
 
   return (

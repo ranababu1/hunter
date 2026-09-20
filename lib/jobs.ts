@@ -1,93 +1,72 @@
 import { promises as fs } from "fs";
 import path from "path";
-import type { DailyDigest, FetchesSnapshot, Job } from "./types";
-import { CACHE_TTL, cacheGet, cacheSet, invalidateUser, userCacheKey } from "./cache";
-import { getRedis } from "./users";
-import { u } from "./keys";
+import type { DailyDigest, FetchRun, FetchesSnapshot, Job } from "./types";
+import {
+  CACHE_TTL,
+  cacheGet,
+  cacheSet,
+  invalidateUser,
+  userCacheKey,
+} from "./cache";
+import {
+  getFetchRuns,
+  getLastFetchDate,
+  getRedis,
+  saveFetchRuns,
+  setLastFetchDate,
+} from "./users";
+import { GLOBAL, u } from "./keys";
+
+/**
+ * Job data is STRICTLY per tenant. Every read below takes a userId and
+ * touches only `hunter:u:{userId}:*`. The `data/*.json` files are a legacy
+ * seed that belongs to the owner account; they are copied into the admin
+ * tenant exactly once (see maybeMigrateSeedJobsToUser) and are never served
+ * to any other user.
+ */
 
 const dataDir = path.join(process.cwd(), "data");
 
-const KEYS = {
-  consolidated: "static:jobs:consolidated",
-  digests: "static:jobs:allDigests",
-  fetches: "static:jobs:fetchesSnapshot",
-  dailyDates: "static:jobs:dailyDates",
-} as const;
+// ── Legacy seed files (admin migration only — never serve to tenants) ──
 
-export async function getConsolidatedJobs(): Promise<Job[]> {
-  const hit = cacheGet<Job[]>(KEYS.consolidated);
-  if (hit !== undefined) return hit;
-  const raw = await fs.readFile(path.join(dataDir, "jobs.json"), "utf8");
-  const jobs = JSON.parse(raw) as Job[];
-  cacheSet(KEYS.consolidated, jobs, CACHE_TTL.STATIC);
-  return jobs;
-}
-
-export async function getDailyDigest(
-  date?: string,
-): Promise<DailyDigest | null> {
-  const dailyDir = path.join(dataDir, "daily");
+async function readSeedJobsFile(): Promise<Job[]> {
   try {
-    if (date) {
-      const ck = `static:jobs:digest:${date}`;
-      const hit = cacheGet<DailyDigest | null>(ck);
-      if (hit !== undefined) return hit;
-      const file = path.join(dailyDir, `${date}.json`);
-      const raw = await fs.readFile(file, "utf8");
-      const digest = JSON.parse(raw) as DailyDigest;
-      cacheSet(ck, digest, CACHE_TTL.STATIC);
-      return digest;
-    }
-    const files = (await fs.readdir(dailyDir))
-      .filter((f) => f.endsWith(".json"))
-      .sort()
-      .reverse();
-    if (files.length === 0) return null;
-    const latestDate = files[0].replace(/\.json$/, "");
-    return getDailyDigest(latestDate);
-  } catch {
-    return null;
-  }
-}
-
-export async function listDailyDates(): Promise<string[]> {
-  const hit = cacheGet<string[]>(KEYS.dailyDates);
-  if (hit !== undefined) return hit;
-  const dailyDir = path.join(dataDir, "daily");
-  try {
-    const dates = (await fs.readdir(dailyDir))
-      .filter((f) => f.endsWith(".json"))
-      .map((f) => f.replace(/\.json$/, ""))
-      .sort()
-      .reverse();
-    cacheSet(KEYS.dailyDates, dates, CACHE_TTL.STATIC);
-    return dates;
+    const raw = await fs.readFile(path.join(dataDir, "jobs.json"), "utf8");
+    const jobs = JSON.parse(raw) as Job[];
+    return Array.isArray(jobs) ? jobs : [];
   } catch {
     return [];
   }
 }
 
-export async function getAllDailyDigests(): Promise<DailyDigest[]> {
-  const hit = cacheGet<DailyDigest[]>(KEYS.digests);
-  if (hit !== undefined) return hit;
-  const dates = await listDailyDates();
-  const digests: DailyDigest[] = [];
-  for (const date of dates) {
-    const d = await getDailyDigest(date);
-    if (d) digests.push(d);
+async function readSeedDigestsFile(): Promise<DailyDigest[]> {
+  const dailyDir = path.join(dataDir, "daily");
+  try {
+    const files = (await fs.readdir(dailyDir))
+      .filter((f) => f.endsWith(".json"))
+      .sort();
+    const digests: DailyDigest[] = [];
+    for (const f of files) {
+      try {
+        const raw = await fs.readFile(path.join(dailyDir, f), "utf8");
+        const d = parseDigest(JSON.parse(raw) as DailyDigest);
+        if (d) digests.push(d);
+      } catch {
+        // skip unreadable file
+      }
+    }
+    return digests;
+  } catch {
+    return [];
   }
-  cacheSet(KEYS.digests, digests, CACHE_TTL.STATIC);
-  return digests;
 }
 
-export async function getFetchesSnapshot(): Promise<FetchesSnapshot | null> {
-  const hit = cacheGet<FetchesSnapshot | null>(KEYS.fetches);
-  if (hit !== undefined) return hit;
+async function readSeedFetchesFile(): Promise<FetchesSnapshot | null> {
   try {
     const raw = await fs.readFile(path.join(dataDir, "fetches.json"), "utf8");
-    const snapshot = JSON.parse(raw) as FetchesSnapshot;
-    cacheSet(KEYS.fetches, snapshot, CACHE_TTL.STATIC);
-    return snapshot;
+    const snap = JSON.parse(raw) as FetchesSnapshot;
+    if (!snap || !Array.isArray(snap.companies)) return null;
+    return snap;
   } catch {
     return null;
   }
@@ -159,7 +138,6 @@ export function mergeJobsById(existing: Job[], incoming: Job[]): Job[] {
   for (const j of incoming) {
     if (j?.id) map.set(j.id, j); // newer wins
   }
-  // Preserve relative order: keep existing order for survivors, append new ids
   const seen = new Set<string>();
   const out: Job[] = [];
   for (const j of existing) {
@@ -252,40 +230,78 @@ export async function getUserDailyDigests(
   return digests;
 }
 
-/**
- * Prefer per-user Redis jobs when the list is non-empty; else global data/.
- * Keeps empty tenants working off the shared seed files.
- */
-export async function getJobsPreferUser(
-  userId: string | null | undefined,
-): Promise<Job[]> {
-  if (userId) {
-    const userJobs = await getUserJobs(userId);
-    if (userJobs.length > 0) return userJobs;
-  }
-  try {
-    return await getConsolidatedJobs();
-  } catch {
-    return [];
-  }
-}
+// ── One-time seed → admin tenant migration ──────────────────────────
+
+const MIGRATED_JOBS_CACHE_KEY = "global:migratedJobs";
 
 /**
- * Prefer per-user digests when present (length>0); else global data/daily/.
+ * Copy the legacy `data/jobs.json`, `data/daily/*.json` and
+ * `data/fetches.json` into ONE tenant (the owner/admin) exactly once, then
+ * set `hunter:migrated:jobs:v1`. Jobs already ingested into Redis win over
+ * the seed copy. Safe to call on every authenticated request (flag is
+ * cached in-process for 60s).
  */
-export async function getDigestsPreferUser(
-  userId: string | null | undefined,
-): Promise<{ dates: string[]; digests: DailyDigest[] }> {
-  if (userId) {
-    const digests = await getUserDailyDigests(userId);
-    if (digests.length > 0) {
-      const dates = digests.map((d) => d.date);
-      return { dates, digests };
+export async function maybeMigrateSeedJobsToUser(
+  userId: string,
+): Promise<void> {
+  if (cacheGet<boolean>(MIGRATED_JOBS_CACHE_KEY)) return;
+  const redis = getRedis();
+  if (!redis) return;
+  try {
+    const flag = await redis.get(GLOBAL.migratedJobs);
+    if (flag) {
+      cacheSet(MIGRATED_JOBS_CACHE_KEY, true, 60_000);
+      return;
     }
+
+    const seedJobs = await readSeedJobsFile();
+    if (seedJobs.length > 0) {
+      const existing = await getUserJobs(userId);
+      // existing (ingested) is "incoming" so it wins over the seed copy
+      await saveUserJobs(userId, mergeJobsById(seedJobs, existing));
+    }
+
+    const seedDigests = await readSeedDigestsFile();
+    for (const d of seedDigests) {
+      const already = await getUserDailyDigest(userId, d.date);
+      if (!already) await saveUserDailyDigest(userId, d);
+    }
+
+    const snap = await readSeedFetchesFile();
+    if (snap) {
+      const runs = await getFetchRuns(userId);
+      if (runs.length === 0) {
+        const run: FetchRun = {
+          id: `seed-${snap.runDate}`,
+          runDate: snap.runDate,
+          createdAt: snap.updatedAt || new Date().toISOString(),
+          status: "ok",
+          cadenceApplied: "daily",
+          companiesChecked: snap.companies.length,
+          jobsFound: snap.companies.reduce(
+            (s, c) => s + (c.jobsFetched || 0),
+            0,
+          ),
+          notes:
+            "Imported from legacy data/fetches.json during tenant migration",
+          source: "seed",
+          companyResults: snap.companies,
+        };
+        await saveFetchRuns(userId, [run]);
+        const last = await getLastFetchDate(userId);
+        if (!last) await setLastFetchDate(userId, snap.runDate);
+      }
+    }
+
+    await redis.set(GLOBAL.migratedJobs, new Date().toISOString());
+    cacheSet(MIGRATED_JOBS_CACHE_KEY, true, 60_000);
+    invalidateUser(userId);
+    console.info(
+      "[hunter] Migrated seed job files → tenant",
+      userId,
+      `(${seedJobs.length} jobs, ${seedDigests.length} digests)`,
+    );
+  } catch (err) {
+    console.warn("[hunter] maybeMigrateSeedJobsToUser failed:", err);
   }
-  const [dates, digests] = await Promise.all([
-    listDailyDates(),
-    getAllDailyDigests(),
-  ]);
-  return { dates, digests };
 }

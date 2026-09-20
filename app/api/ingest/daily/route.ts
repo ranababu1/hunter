@@ -8,6 +8,7 @@ import {
   ensureAdminPrivileges,
 } from "@/lib/auth";
 import {
+  getRedis,
   findUserByEmail,
   ensureAdminBootstrap,
   getBilling,
@@ -234,9 +235,7 @@ export async function POST(req: NextRequest) {
   }
   const jobs = (body.jobs as unknown[]).filter(isJobLike) as Job[];
 
-  const redisOk = Boolean(
-    process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN,
-  );
+  const redisOk = getRedis() != null;
   if (!redisOk) {
     return NextResponse.json(
       { error: "Redis required for tenant ingest" },

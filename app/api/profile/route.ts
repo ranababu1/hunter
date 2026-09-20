@@ -6,7 +6,8 @@ import {
   recomputeAndStoreUsage,
 } from "@/lib/redis";
 import { getProfile, saveProfile, updateUserFields } from "@/lib/users";
-import type { TargetRole, UserProfile } from "@/lib/types";
+import type { ExperienceLevel, TargetRole, UserProfile } from "@/lib/types";
+import { EXPERIENCE_LEVELS } from "@/lib/types";
 
 const MAX_RESUME_CHARS = 200_000;
 
@@ -102,6 +103,45 @@ export async function PUT(request: Request) {
     };
   }
 
+  let locations = prev.locations ?? [];
+  if ("locations" in body) {
+    if (!Array.isArray(body.locations)) {
+      return NextResponse.json(
+        { error: "locations must be an array of strings" },
+        { status: 400 },
+      );
+    }
+    const seen = new Set<string>();
+    locations = body.locations
+      .map((l) => (typeof l === "string" ? l.trim().slice(0, 60) : ""))
+      .filter((l) => {
+        if (!l) return false;
+        const k = l.toLowerCase();
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      })
+      .slice(0, 10);
+  }
+
+  let experienceLevel = prev.experienceLevel;
+  if ("experienceLevel" in body) {
+    const v = body.experienceLevel;
+    if (v == null || v === "") {
+      experienceLevel = undefined;
+    } else if (
+      typeof v === "string" &&
+      EXPERIENCE_LEVELS.some((e) => e.id === v)
+    ) {
+      experienceLevel = v as ExperienceLevel;
+    } else {
+      return NextResponse.json(
+        { error: "Invalid experienceLevel" },
+        { status: 400 },
+      );
+    }
+  }
+
   let phone = prev.phone ?? user.phone ?? "";
   if ("phone" in body) {
     phone = asString(body.phone).trim().slice(0, 40);
@@ -121,6 +161,8 @@ export async function PUT(request: Request) {
     resumeText,
     resumeMeta,
     targetRoles,
+    locations,
+    experienceLevel,
     updatedAt: new Date().toISOString(),
   };
 

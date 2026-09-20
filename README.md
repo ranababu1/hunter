@@ -26,7 +26,7 @@ npm install
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Register a free account, or sign in as admin.
+Open [http://localhost:3000](http://localhost:3000). Register a free account (you will be walked through onboarding: desired roles, preferences, companies) or sign in as admin.
 
 Without `AUTH_SECRET` / `SITE_PASSWORD`, middleware allows all routes in development only (warning in logs).
 
@@ -40,6 +40,7 @@ Without `AUTH_SECRET` / `SITE_PASSWORD`, middleware allows all routes in develop
 | `SITE_PASSWORD` | Optional | Legacy password-only admin login + secret fallback |
 | `UPSTASH_REDIS_REST_URL` | Yes (multi-user) | Rest URL from Upstash console |
 | `UPSTASH_REDIS_REST_TOKEN` | Yes (multi-user) | Rest token from Upstash console |
+| `HUNTER_MEMORY_REDIS` | Local only | `1` = in-process store for dev/smoke tests; ignored on Vercel |
 | `HUNTER_INGEST_SECRET` | Yes (morning publish) | Bearer secret for `POST /api/ingest/daily` — never commit |
 
 Without Redis, visited/status/companies mutations return 503; APIs no-op gracefully where noted.
@@ -89,7 +90,7 @@ curl -X POST https://hunter.imrn.dev/api/ingest/daily \
 - With bearer, `email` is required to target a user (defaults to `ADMIN_EMAIL` / `imrn.dev@gmail.com`); must be admin email or an existing user. Session auth ignores `email` and uses the session user.
 - Writes Redis: `hunter:u:{userId}:daily:{date}`, merges into `hunter:u:{userId}:jobs`, optional `fetchRuns` + `lastFetchDate`.
 - Helper: `node scripts/publish-tenant.mjs payload.json`
-- **Fallback:** Daily / Board / Kanban still load global `data/jobs.json` + `data/daily/*.json` when the tenant has no Redis jobs/digests yet. Global files are not removed.
+- **Strict tenancy:** Daily / Board / Kanban / Fetches read only the tenant’s own Redis keys. There is no fallback to `data/*.json`; a new account sees an empty feed until ingest runs for it. The legacy `data/` files are copied into the **admin** tenant once (`hunter:migrated:jobs:v1`) and are otherwise unused.
 
 Job fields: `id`, `company`, `role`, `level`, `aiFocus`, `location`, `postedOrUpdated`, `match`, `url`, `whyMatch`, `dateSeen`, `isNew`.
 

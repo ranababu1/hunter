@@ -6,7 +6,7 @@ import type {
   Job,
   UserProfile,
 } from "./types";
-import { getJobsPreferUser, getFetchesSnapshot } from "./jobs";
+import { getUserJobs } from "./jobs";
 import { getCompanies } from "./redis";
 import {
   getBilling,
@@ -26,7 +26,7 @@ import type { User } from "./types";
 import { recomputeAndStoreUsage } from "./redis";
 
 function normalizeName(s: string): string {
-  return s.trim().toLowerCase().replace(/\s+/g, " ");
+  return s.trim().toLowerCase().replace(/[ ]+/g, " ");
 }
 
 /** Soft company name match (handles "Amazon / AWS" vs "Amazon"). */
@@ -35,10 +35,11 @@ function companyNamesMatch(a: string, b: string): boolean {
   const nb = normalizeName(b);
   if (na === nb) return true;
   if (na.includes(nb) || nb.includes(na)) return true;
-  // Split on / and &
-  const partsA = na.split(/[\/|&]+/).map((p) => p.trim()).filter(Boolean);
-  const partsB = nb.split(/[\/|&]+/).map((p) => p.trim()).filter(Boolean);
-  return partsA.some((pa) => partsB.some((pb) => pa === pb || pa.includes(pb) || pb.includes(pa)));
+  const partsA = na.split(/[/|&]+/).map((p) => p.trim()).filter(Boolean);
+  const partsB = nb.split(/[/|&]+/).map((p) => p.trim()).filter(Boolean);
+  return partsA.some((pa) =>
+    partsB.some((pb) => pa === pb || pa.includes(pb) || pb.includes(pa)),
+  );
 }
 
 function extractKeywords(profile: UserProfile): string[] {
@@ -48,7 +49,6 @@ function extractKeywords(profile: UserProfile): string[] {
     .split(/[^a-z0-9+#.]/i)
     .map((t) => t.trim())
     .filter((t) => t.length >= 3);
-  // Prefer role labels; add frequent-ish resume tokens (dedupe)
   const set = new Set<string>([...fromRoles]);
   for (const t of tokens) {
     if (set.size >= 40) break;
@@ -64,9 +64,10 @@ function jobMatchesKeywords(job: Job, keywords: string[]): boolean {
 }
 
 /**
- * Phase 2 fetch without external crawler: match user's active companies
- * against per-user jobs (fallback global data/jobs.json) + data/fetches.json catalog.
- * Morning ingest (POST /api/ingest/daily) writes the same FetchRun shape.
+ * Per-tenant fetch (no external crawler on Vercel): match the user's active
+ * companies against the user's OWN ingested jobs (`hunter:u:{id}:jobs`).
+ * Nothing global is consulted. Morning ingest (POST /api/ingest/daily)
+ * writes the same FetchRun shape.
  */
 export async function runUserFetch(user: User): Promise<
   | { ok: true; run: FetchRun; nextEligibleDate: string }
@@ -102,26 +103,7 @@ export async function runUserFetch(user: User): Promise<
   const active = companies.filter((c) => c.active);
   const profile = await getProfile(user.id);
   const keywords = extractKeywords(profile);
-
-  let jobs: Job[] = [];
-  let catalog: Awaited<ReturnType<typeof getFetchesSnapshot>> = null;
-  try {
-    jobs = await getJobsPreferUser(user.id);
-  } catch {
-    jobs = [];
-  }
-  try {
-    catalog = await getFetchesSnapshot();
-  } catch {
-    catalog = null;
-  }
-
-  const portalByCompany = new Map<string, string>();
-  if (catalog) {
-    for (const c of catalog.companies) {
-      portalByCompany.set(normalizeName(c.company), c.careerPortal);
-    }
-  }
+  const jobs = await getUserJobs(user.id);
 
   const runDate = todayIST();
   const companyResults: CompanyFetch[] = [];
@@ -133,15 +115,6 @@ export async function runUserFetch(user: User): Promise<
         companyNamesMatch(j.company, company.name) &&
         jobMatchesKeywords(j, keywords),
     );
-    const seedRow = catalog?.companies.find((c) =>
-      companyNamesMatch(c.company, company.name),
-    );
-    const portal =
-      company.careersUrl ||
-      seedRow?.careerPortal ||
-      portalByCompany.get(normalizeName(company.name)) ||
-      "";
-
     const count = matchedJobs.length;
     jobsFound += count;
 
@@ -150,30 +123,23 @@ export async function runUserFetch(user: User): Promise<
     let notes: string | undefined;
 
     if (count > 0) {
-      outcome = "ok";
-      notes = `Matched ${count} job(s) from catalog against profile keywords (source: catalog/seed)`;
-    } else if (seedRow) {
-      // Company known in seed but no keyword hits in jobs.json
-      if (seedRow.outcome === "error") {
-        outcome = "error";
-        issue = seedRow.issue ?? "Seed reported fetch error";
-      } else if (seedRow.jobsFetched === 0 || seedRow.outcome === "zero") {
-        outcome = "zero";
-        issue = seedRow.issue ?? "No matching jobs in catalog for active filters";
-      } else {
-        outcome = "zero";
-        issue =
-          "Company present in seed catalog but no jobs matched target roles / resume keywords";
-        notes = `Seed had ${seedRow.jobsFetched} job(s); filtered to 0`;
-      }
+      notes = `Matched ${count} job(s) in your feed against your target roles / resume keywords`;
+    } else if (jobs.length === 0) {
+      outcome = "zero";
+      issue = "No jobs in your feed yet — the next morning ingest will populate it";
+    } else if (company.portalOk === false) {
+      outcome = "error";
+      issue = company.portalIssue
+        ? `Careers portal flagged: ${company.portalIssue}`
+        : "Careers portal flagged as problematic";
     } else {
       outcome = "zero";
-      issue = "Company not found in global jobs/fetches catalog (Phase 2 seed match)";
+      issue = "No jobs from this company in your feed matched your target roles";
     }
 
     companyResults.push({
       company: company.name,
-      careerPortal: portal || company.careersUrl || "#",
+      careerPortal: company.careersUrl || "#",
       jobsFetched: count,
       lastFetched: runDate,
       outcome,
@@ -190,7 +156,7 @@ export async function runUserFetch(user: User): Promise<
   } else if (
     companyResults.some((r) => r.outcome === "zero" || r.outcome === "error")
   ) {
-    status = jobsFound > 0 ? "partial" : "partial";
+    status = "partial";
   }
 
   const run: FetchRun = {
@@ -204,7 +170,7 @@ export async function runUserFetch(user: User): Promise<
     notes:
       active.length === 0
         ? "No active companies — add companies and mark them active"
-        : `Phase 2 catalog/seed match · ${keywords.length} keyword(s) from profile`,
+        : `Matched against ${jobs.length} job(s) in your feed · ${keywords.length} keyword(s) from profile`,
     source: "catalog",
     companyResults,
   };
@@ -243,33 +209,13 @@ export async function getFetchesPayload(user: User) {
   );
   const canRun = canRunFetchToday(lastFetchDate, ent.fetchCadence);
 
-  // Latest snapshot: prefer newest user run; else synthesize from global seed
-  let latest: FetchRun | null = runs[0] ?? null;
-  let fromSeed = false;
-
-  if (!latest) {
-    const seed = await getFetchesSnapshot();
-    if (seed) {
-      fromSeed = true;
-      latest = {
-        id: "seed",
-        runDate: seed.runDate,
-        createdAt: seed.updatedAt,
-        status: "ok",
-        cadenceApplied: ent.fetchCadence,
-        companiesChecked: seed.companies.length,
-        jobsFound: seed.companies.reduce((s, c) => s + c.jobsFetched, 0),
-        notes: "Global seed catalog (data/fetches.json) — run a personal fetch to start history",
-        source: "seed",
-        companyResults: seed.companies,
-      };
-    }
-  }
+  // Strictly the tenant's own history. No global seed fallback.
+  const latest: FetchRun | null = runs[0] ?? null;
 
   return {
     runs,
     latest,
-    fromSeed,
+    fromSeed: false,
     lastFetchDate,
     nextEligibleDate,
     canRun,

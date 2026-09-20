@@ -6,7 +6,15 @@
 
 type CacheEntry = { value: unknown; expiresAt: number };
 
-const store = new Map<string, CacheEntry>();
+// Next bundles pages and route handlers separately; a module-level Map would
+// be duplicated per bundle and a mutation in /api/* could not invalidate the
+// copy a page render reads. Share one store per process via globalThis.
+const STORE_KEY = "__hunterCacheStore";
+type GlobalWithStore = typeof globalThis & {
+  [STORE_KEY]?: Map<string, CacheEntry>;
+};
+const g = globalThis as GlobalWithStore;
+const store: Map<string, CacheEntry> = (g[STORE_KEY] ??= new Map());
 
 /** Soft cap to avoid unbounded growth on long-lived Node processes. */
 const MAX_ENTRIES = 500;
