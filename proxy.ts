@@ -16,6 +16,9 @@ const PUBLIC_PREFIXES = [
   "/register",
   "/api/auth/login",
   "/api/auth/register",
+  // Morning ingest: route enforces its own auth (Bearer HUNTER_INGEST_SECRET or session).
+  // Same exemption the previous middleware.ts carried.
+  "/api/ingest",
   "/_next",
   "/favicon",
 ];
@@ -66,6 +69,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|.*\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

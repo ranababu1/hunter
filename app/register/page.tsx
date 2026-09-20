@@ -25,8 +25,8 @@ export default function RegisterPage() {
         body: JSON.stringify({
           email: email.trim(),
           password,
-          name: name.trim() || undefined,
-          phone: phone.trim() || undefined,
+          name: name.trim(),
+          phone: phone.trim(),
         }),
       });
       const data = (await res.json()) as { error?: string };
@@ -70,12 +70,14 @@ export default function RegisterPage() {
         </p>
 
         <label className="mb-2 block text-xs font-medium tracking-wide text-[var(--text-dim)]">
-          NAME (OPTIONAL)
+          NAME
         </label>
         <div className="relative mb-4">
           <User className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-dim)]" />
           <input
             type="text"
+            required
+            autoComplete="name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Your name"
@@ -101,12 +103,16 @@ export default function RegisterPage() {
 
 
         <label className="mb-2 block text-xs font-medium tracking-wide text-[var(--text-dim)]">
-          PHONE (OPTIONAL)
+          PHONE
         </label>
         <div className="relative mb-4">
           <Phone className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-dim)]" />
           <input
             type="tel"
+            required
+            inputMode="tel"
+            pattern="^\+?[0-9 ()-]{7,20}$"
+            title="7–15 digits, optional +country code"
             autoComplete="tel"
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
@@ -140,7 +146,13 @@ export default function RegisterPage() {
 
         <button
           type="submit"
-          disabled={loading || !email || password.length < 8}
+          disabled={
+            loading ||
+            !name.trim() ||
+            !email ||
+            !phone.trim() ||
+            password.length < 8
+          }
           className="group flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 font-medium text-[#0d1117] transition disabled:opacity-50"
           style={{ background: "var(--accent)" }}
         >
