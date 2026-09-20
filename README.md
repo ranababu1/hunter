@@ -1,6 +1,6 @@
 # Hunter
 
-Private multi-user job-tracking HQ for Bengaluru AI / GenAI roles. Dark editorial UI with daily digest, consolidated board, and kanban — backed by Upstash Redis (per-user state).
+A structured job-hunt workspace. People lose months and money to unstructured searching and miss the right roles; Hunter does the work — research, profiling, sorting and kanban-style application tracking — in a private, per-account workspace. Public site at `/`, `/about`, `/pricing`, `/contact`; the app lives under `/daily`, `/board`, `/kanban`, `/companies`, `/fetches`, `/profile`, `/billing`.
 
 **Repo:** [github.com/ranababu1/hunter](https://github.com/ranababu1/hunter)
 
@@ -41,6 +41,7 @@ Without `AUTH_SECRET` / `SITE_PASSWORD`, middleware allows all routes in develop
 | `UPSTASH_REDIS_REST_URL` | Yes (multi-user) | Rest URL from Upstash console |
 | `UPSTASH_REDIS_REST_TOKEN` | Yes (multi-user) | Rest token from Upstash console |
 | `HUNTER_MEMORY_REDIS` | Local only | `1` = in-process store for dev/smoke tests; ignored on Vercel |
+| `NEXT_PUBLIC_CONTACT_EMAIL` | Optional | Address shown on `/contact`; defaults to `ADMIN_EMAIL` |
 | `HUNTER_INGEST_SECRET` | Yes (morning publish) | Bearer secret for `POST /api/ingest/daily` — never commit |
 
 Without Redis, visited/status/companies mutations return 503; APIs no-op gracefully where noted.
@@ -99,7 +100,7 @@ Job fields: `id`, `company`, `role`, `level`, `aiFocus`, `location`, `postedOrUp
 - Cookies: `hunter_uid` + `hunter_session` (httpOnly, sameSite=lax, secure in prod, 30 days)
 - Token = `v2.<exp>.<HMAC-SHA256("hunter:uid:{userId}:{exp}", AUTH_SECRET or SITE_PASSWORD)>` — expiring and uid-bound (`lib/session-token.ts`)
 - `proxy.ts` (Next 16 middleware) gates all non-public routes; `(app)/layout.tsx` re-checks the user exists
-- Public: `/login`, `/register`, `/api/auth/login`, `/api/auth/register`, `/api/ingest/*` (bearer-auth, validates itself)
+- Public: `/`, `/about`, `/pricing`, `/contact`, `/api/contact`, `/login`, `/register`, `/api/auth/login`, `/api/auth/register`, `/api/ingest/*` (bearer-auth, validates itself)
 - Register requires name, email, phone (normalized to `+digits`, 7–15 digits) and an 8+ char password
 - Login/register are rate-limited per IP / email via Redis (`429` + `Retry-After`)
 - Passwords: PBKDF2-SHA256 (Web Crypto)

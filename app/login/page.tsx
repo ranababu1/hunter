@@ -33,7 +33,7 @@ function LoginForm() {
         setLoading(false);
         return;
       }
-      const from = params.get("from") || "/";
+      const from = params.get("from") || "/daily";
       router.replace(from);
       router.refresh();
     } catch {
@@ -56,13 +56,13 @@ function LoginForm() {
         </div>
         <div>
           <div className="wordmark text-2xl">Hunter</div>
-          <div className="eyebrow mt-1">Multi-user portal</div>
+          <div className="eyebrow mt-1">Welcome back</div>
         </div>
       </div>
 
       <h1 className="prose-title mb-2 text-2xl text-[var(--text)]">Sign in</h1>
       <p className="mb-8 text-sm leading-relaxed text-[var(--text-muted)]">
-        Email and password access to your daily digest, board, and kanban.
+        Pick up your hunt where you left it: digest, board and pipeline.
       </p>
 
       {params.get("reason") === "expired" && !error && (

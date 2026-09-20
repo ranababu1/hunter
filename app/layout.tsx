@@ -10,8 +10,12 @@ const atkinson = Atkinson_Hyperlegible({
 });
 
 export const metadata: Metadata = {
-  title: "Hunter",
-  description: "Private job HQ — Bengaluru AI / GenAI roles",
+  title: {
+    default: "Hunter — Your job hunt, finally structured",
+    template: "%s · Hunter",
+  },
+  description:
+    "Hunter does the work of a serious job hunt: research, profiling, sorting and kanban-style application tracking in one private workspace.",
 };
 
 export default function RootLayout({

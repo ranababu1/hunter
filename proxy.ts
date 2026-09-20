@@ -12,6 +12,12 @@ const UID_COOKIE = "hunter_uid";
 const SESSION_COOKIE = "hunter_session";
 
 const PUBLIC_PREFIXES = [
+  // Marketing site (exact "/" only — see isPublic; "/daily" etc. stay gated)
+  "/",
+  "/about",
+  "/pricing",
+  "/contact",
+  "/api/contact",
   "/login",
   "/register",
   "/api/auth/login",
@@ -26,7 +32,7 @@ const PUBLIC_PREFIXES = [
 function isPublic(pathname: string): boolean {
   if (pathname === "/icon.svg") return true;
   return PUBLIC_PREFIXES.some(
-    (p) => pathname === p || pathname.startsWith(p + "/"),
+    (p) => pathname === p || (p !== "/" && pathname.startsWith(p + "/")),
   );
 }
 

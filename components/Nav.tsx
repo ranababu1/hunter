@@ -18,7 +18,7 @@ import {
 import { useMe } from "@/components/MeProvider";
 
 const baseLinks = [
-  { href: "/", label: "Daily", icon: Newspaper },
+  { href: "/daily", label: "Daily", icon: Newspaper },
   { href: "/board", label: "Board", icon: LayoutGrid },
   { href: "/kanban", label: "Kanban", icon: Columns3 },
   { href: "/fetches", label: "Fetches", icon: Radio },
@@ -48,7 +48,7 @@ export function Nav() {
   return (
     <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-[rgba(13,17,23,0.92)] backdrop-blur-md">
       <div className="mx-auto flex h-14 w-full max-w-none items-center justify-between gap-4 px-4 sm:px-6">
-        <Link href="/" className="flex items-center gap-2.5">
+        <Link href="/daily" className="flex items-center gap-2.5">
           <div
             className="flex h-8 w-8 items-center justify-center rounded-lg"
             style={{
@@ -64,7 +64,7 @@ export function Nav() {
         <nav className="flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--bg-elevated)] p-1">
           {links.map(({ href, label, icon: Icon }) => {
             const active =
-              href === "/" ? pathname === "/" : pathname.startsWith(href);
+              pathname === href || pathname.startsWith(href + "/");
             return (
               <Link
                 key={href}

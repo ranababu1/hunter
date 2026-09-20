@@ -43,7 +43,7 @@ On admin promote / login / `/api/me`, if `hunter:migrated:v1` is unset and globa
     Rotating `AUTH_SECRET` logs every tenant out. Legacy v1 (non-expiring) tokens are no longer accepted.
 - Secret: `AUTH_SECRET` or fallback `SITE_PASSWORD`.
 - `proxy.ts` (Next 16 rename of `middleware.ts`) requires a valid session for everything except
-  `/login`, `/register`, `/api/auth/login|register`, `/api/ingest/*` (bearer-auth, validates itself), `_next`, favicon/icon. Invalid or expired cookies →
+  `/`, `/about`, `/pricing`, `/contact`, `/api/contact`, `/login`, `/register`, `/api/auth/login|register`, `/api/ingest/*` (bearer-auth, validates itself), `_next`, favicon/icon. Invalid or expired cookies →
   `401` JSON for `/api/*`, else redirect to `/login?from=…&reason=expired`.
 - `(app)/layout.tsx` additionally calls `requireUser()` server-side: a *validly signed* cookie whose user no
   longer exists (deleted account, wiped Redis) is redirected to `/login?reason=expired` instead of rendering
@@ -84,6 +84,14 @@ Client IP comes from `x-forwarded-for` (first hop) then `x-real-ip`.
    another tenant's entry.
 4. Global, read-only job data (`data/*.json`) is intentionally shared; nothing tenant-specific is written there.
 5. Sessions are bound to a uid *and* an expiry; a leaked cookie is useless for another uid and dies after 30 days.
+
+## Public site (`app/(marketing)`)
+
+- Routes: `/` (home; authenticated visitors are redirected to `/daily`), `/about`, `/pricing` (renders `PLAN_CATALOG`), `/contact`.
+- Shared `MarketingHeader` / `MarketingFooter`; header shows **Sign in / Start free**, or **Open app** when a session cookie is present.
+- `POST /api/contact` (public, 5/hour per IP) stores messages in the Redis hash `hunter:contact:messages`; `GET /api/admin/contact` lists them (admin only). Contact address = `NEXT_PUBLIC_CONTACT_EMAIL` → `ADMIN_EMAIL` → hardcoded admin.
+- The authenticated feed moved from `/` to **`/daily`**; login defaults to `/daily`, onboarding finishes at `/daily`.
+- Positioning: Hunter is a structured job-hunt workspace (research, profiling, sorting, kanban tracking), not a regional or AI-only job search.
 
 ## Onboarding (blank-slate tenants)
 
@@ -165,6 +173,8 @@ Extended entitlements (Phase 2):
 | GET | `/api/fetches` | Per-user runs + cadence (no seed fallback) |
 | POST | `/api/fetches/run` | Cadence-enforced match of the tenant's active companies against the tenant's own jobs |
 | GET | `/api/admin/users` | Admin-only user table |
+| GET | `/api/admin/contact` | Admin-only contact-form inbox |
+| POST | `/api/contact` | Public contact form → Redis; 5/hour per IP |
 | GET | `/api/billing/plans` | Catalog JSON |
 | POST | `/api/billing/checkout` | **501** stub (Stripe not integrated) |
 | POST | `/api/billing/webhook` | **501** stub |
