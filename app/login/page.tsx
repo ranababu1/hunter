@@ -10,7 +10,6 @@ function LoginForm() {
   const params = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [legacy, setLegacy] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -19,9 +18,7 @@ function LoginForm() {
     setLoading(true);
     setError("");
     try {
-      const body = legacy
-        ? { password }
-        : { email: email.trim(), password };
+      const body = { email: email.trim(), password };
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -71,35 +68,32 @@ function LoginForm() {
         </div>
       )}
 
-      {!legacy && (
-        <>
-          <label className="mb-2 block text-xs font-medium tracking-wide text-[var(--text-dim)]">
-            EMAIL
-          </label>
-          <div className="relative mb-4">
-            <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-dim)]" />
-            <input
-              type="email"
-              autoFocus
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              className="w-full rounded-xl border border-[var(--border-strong)] bg-[var(--bg)] py-3 pl-10 pr-4 text-[var(--text)] outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
-            />
-          </div>
-        </>
-      )}
+      <label className="mb-2 block text-xs font-medium tracking-wide text-[var(--text-dim)]">
+        EMAIL
+      </label>
+      <div className="relative mb-4">
+        <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-dim)]" />
+        <input
+          type="email"
+          required
+          autoFocus
+          autoComplete="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="you@example.com"
+          className="w-full rounded-xl border border-[var(--border-strong)] bg-[var(--bg)] py-3 pl-10 pr-4 text-[var(--text)] outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
+        />
+      </div>
 
       <label className="mb-2 block text-xs font-medium tracking-wide text-[var(--text-dim)]">
-        {legacy ? "SITE PASSWORD" : "PASSWORD"}
+        PASSWORD
       </label>
       <div className="relative mb-4">
         <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-dim)]" />
         <input
           type="password"
-          autoFocus={legacy}
-          autoComplete={legacy ? "current-password" : "current-password"}
+          required
+          autoComplete="current-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           placeholder="••••••••"
@@ -115,7 +109,7 @@ function LoginForm() {
 
       <button
         type="submit"
-        disabled={loading || !password || (!legacy && !email)}
+        disabled={loading || !password || !email}
         className="group flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 font-medium text-[#0d1117] transition disabled:opacity-50"
         style={{ background: "var(--accent)" }}
       >
@@ -127,13 +121,6 @@ function LoginForm() {
         <Link href="/register" className="text-[var(--accent)] hover:underline">
           Create an account
         </Link>
-        <button
-          type="button"
-          onClick={() => setLegacy((v) => !v)}
-          className="text-xs text-[var(--text-dim)] hover:text-[var(--text-muted)]"
-        >
-          {legacy ? "Use email & password" : "Admin: site password login"}
-        </button>
       </div>
     </form>
   );
