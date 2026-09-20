@@ -1,41 +1,15 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { verifySessionToken } from "@/lib/session-token";
+
+/**
+ * Next.js 16 Proxy (formerly middleware): optimistic session check.
+ * Full user lookup / authorization happens in `requireUser` and the
+ * `(app)` layout — this only gates obviously unauthenticated traffic.
+ */
 
 const UID_COOKIE = "hunter_uid";
 const SESSION_COOKIE = "hunter_session";
-
-async function verifySessionEdge(
-  userId: string | undefined,
-  token: string | undefined,
-  secret: string | null,
-): Promise<boolean> {
-  if (!userId || !token) return false;
-  if (!secret) {
-    return token === `dev:${userId}`;
-  }
-  const enc = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    "raw",
-    enc.encode(secret),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const sig = await crypto.subtle.sign(
-    "HMAC",
-    key,
-    enc.encode(`hunter:uid:${userId}`),
-  );
-  const expected = Array.from(new Uint8Array(sig))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-  if (expected.length !== token.length) return false;
-  let out = 0;
-  for (let i = 0; i < expected.length; i++) {
-    out |= expected.charCodeAt(i) ^ token.charCodeAt(i);
-  }
-  return out === 0;
-}
 
 const PUBLIC_PREFIXES = [
   "/login",
@@ -53,7 +27,7 @@ function isPublic(pathname: string): boolean {
   );
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (isPublic(pathname)) {
@@ -66,7 +40,7 @@ export async function middleware(request: NextRequest) {
   const uid = request.cookies.get(UID_COOKIE)?.value;
   const token = request.cookies.get(SESSION_COOKIE)?.value;
 
-  if (await verifySessionEdge(uid, token, secret)) {
+  if (await verifySessionToken(uid, token, secret)) {
     return NextResponse.next();
   }
 
@@ -84,12 +58,14 @@ export async function middleware(request: NextRequest) {
 
   const loginUrl = request.nextUrl.clone();
   loginUrl.pathname = "/login";
+  loginUrl.search = "";
   loginUrl.searchParams.set("from", pathname);
+  if (uid || token) loginUrl.searchParams.set("reason", "expired");
   return NextResponse.redirect(loginUrl);
 }
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|.*\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

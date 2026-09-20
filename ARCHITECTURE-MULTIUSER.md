@@ -19,6 +19,8 @@ All mutable Redis state is prefixed by user id:
 | `hunter:u:{userId}:billing` | BillingAccount |
 | `hunter:u:{userId}:fetchRuns` | FetchRun[] JSON (newest first; trimmed to `maxFetchHistory`) |
 | `hunter:u:{userId}:lastFetchDate` | `YYYY-MM-DD` (Asia/Calcutta) for cadence |
+| `hunter:u:{userId}:importHashes` | Recent company-import SHA-256 hashes (duplicate-import guard, max 50) |
+| `hunter:rl:{scope}:{ip|email}` | Rate-limit counters (INCR + EXPIRE), auto-expire with the window |
 
 **Global job data** (`data/jobs.json`, `data/daily/*.json`, `data/fetches.json`) remains shared — Daily / Board / Kanban still load jobs globally. `data/fetches.json` is also the **career-portal catalog** used when enriching per-user fetch results. Only Redis mutable state is per-user.
 
@@ -29,12 +31,35 @@ On admin promote / login / `/api/me`, if `hunter:migrated:v1` is unset and globa
 ## Auth
 
 - Register / login with email + password (PBKDF2-SHA256, 100k iterations, Web Crypto). Optional `phone` on register.
-- Session cookies (httpOnly, SameSite=lax):
+- Session cookies (httpOnly, SameSite=lax, Secure in production, 30-day `Max-Age`):
   - `hunter_uid` — user id
-  - `hunter_session` — HMAC-SHA256(`hunter:uid:{userId}`, secret)
+  - `hunter_session` — **signed, expiring token** `v2.<expUnixSeconds>.<hmac>` where
+    `hmac = HMAC-SHA256("hunter:uid:{userId}:{exp}", secret)`; implemented once in `lib/session-token.ts`
+    (Web Crypto) and shared by `proxy.ts` and the Node route handlers.
+  - Tokens are rejected when malformed, expired, signed for another uid, or signed with a different secret.
+    Rotating `AUTH_SECRET` logs every tenant out. Legacy v1 (non-expiring) tokens are no longer accepted.
 - Secret: `AUTH_SECRET` or fallback `SITE_PASSWORD`.
-- Middleware requires a valid session (except `/login`, `/register`, `/api/auth/*`).
-- Dev soft-open: if neither secret is set and `NODE_ENV !== production`, routes are allowed with a warning.
+- `proxy.ts` (Next 16 rename of `middleware.ts`) requires a valid session for everything except
+  `/login`, `/register`, `/api/auth/login|register`, `_next`, favicon/icon. Invalid or expired cookies →
+  `401` JSON for `/api/*`, else redirect to `/login?from=…&reason=expired`.
+- `(app)/layout.tsx` additionally calls `requireUser()` server-side: a *validly signed* cookie whose user no
+  longer exists (deleted account, wiped Redis) is redirected to `/login?reason=expired` instead of rendering
+  an empty shell. Dev soft-open still applies.
+- Dev soft-open: if neither secret is set and `NODE_ENV !== production`, routes are allowed with a warning
+  and the unsigned `dev:{userId}` marker is accepted.
+
+### Rate limiting (`lib/rate-limit.ts`)
+
+Fixed-window counters in Redis (`INCR` + `EXPIRE`), **fail-open** when Redis is unavailable.
+
+| Route | Key | Limit |
+|---|---|---|
+| `POST /api/auth/login` | per IP | 20 / 15 min |
+| `POST /api/auth/login` | per email | 10 / 15 min |
+| `POST /api/auth/register` | per IP | 5 / hour |
+
+Over the limit → `429` `{ error: "<human message>", code: "RATE_LIMITED", retryAfterSeconds }` + `Retry-After` header.
+Client IP comes from `x-forwarded-for` (first hop) then `x-real-ip`.
 
 ### Admin (promote-on-me)
 
@@ -45,6 +70,17 @@ On admin promote / login / `/api/me`, if `hunter:migrated:v1` is unset and globa
 - Entitlements: **unlimited companies** + **10 MB** storage + **daily** fetches + **unlimited** fetch history.
 - Legacy: POST `/api/auth/login` with `{ password }` only (SITE_PASSWORD) creates/logs into the admin user for `ADMIN_EMAIL`.
 - Bootstrap: if `ADMIN_EMAIL` + `ADMIN_BOOTSTRAP_PASSWORD` are set, first boot creates the admin user in Redis.
+
+## Tenant isolation guarantees
+
+1. **Every** authenticated route handler and server page resolves the tenant from the session via
+   `requireUser()` and reads/writes only `hunter:u:{user.id}:*`. No handler accepts a user id from the request.
+2. Admin-only data (`/api/admin/users`, `/users`) is gated by `resolveEntitlements(...).isAdmin`, i.e. the
+   `role` stored on the user record, never by a client-supplied flag.
+3. In-memory cache keys are always `u:{userId}:{part}` (see *Caching model*), so one instance cannot serve
+   another tenant's entry.
+4. Global, read-only job data (`data/*.json`) is intentionally shared; nothing tenant-specific is written there.
+5. Sessions are bound to a uid *and* an expiry; a leaked cookie is useless for another uid and dies after 30 days.
 
 ## Plans / entitlements
 
@@ -107,8 +143,8 @@ Extended entitlements (Phase 2):
 
 | Method | Path | Notes |
 |---|---|---|
-| POST | `/api/auth/register` | `{ email, password, name?, phone? }` |
-| POST | `/api/auth/login` | `{ email, password }` or legacy `{ password }` |
+| POST | `/api/auth/register` | `{ email, password, name?, phone? }`; **429** when rate-limited |
+| POST | `/api/auth/login` | `{ email, password }` or legacy `{ password }`; **429** when rate-limited |
 | POST | `/api/auth/logout` | Clears cookies |
 | GET | `/api/me` | user + entitlements + usage + billing; **promotes admin** |
 | GET/POST/PUT/DELETE | `/api/companies` | User-scoped; enforces limits |
@@ -132,7 +168,7 @@ Extended entitlements (Phase 2):
 
 | Variable | Required | Notes |
 |---|---|---|
-| `AUTH_SECRET` | Prod recommended | HMAC session secret |
+| `AUTH_SECRET` | Prod recommended | HMAC session secret; rotating it invalidates all sessions |
 | `ADMIN_EMAIL` | Prod recommended | Defaults to hardcoded `imrn.dev@gmail.com` if unset |
 | `ADMIN_BOOTSTRAP_PASSWORD` | Optional | Seed admin on first boot |
 | `SITE_PASSWORD` | Legacy | Fallback secret + password-only admin login |
@@ -172,4 +208,5 @@ GET `/api/me`, `/api/companies`, `/api/fetches` set `Cache-Control: private, max
 - Live career-portal crawler / morning agent writing FetchRun
 - True PDF parsing quality
 - Stripe SDK + live checkout
-- Email verification
+- Email verification / password reset
+- Server-side session store (revocation before expiry) if needed

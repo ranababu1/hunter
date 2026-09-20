@@ -76,8 +76,10 @@ Jobs JSON remains **global**; Redis mutable state (companies, kanban, profile) i
 
 ## Auth
 
-- Cookies: `hunter_uid` + `hunter_session` (httpOnly, sameSite=lax)
-- Token = HMAC-SHA256 of `hunter:uid:{userId}` with `AUTH_SECRET` (or `SITE_PASSWORD`)
+- Cookies: `hunter_uid` + `hunter_session` (httpOnly, sameSite=lax, secure in prod, 30 days)
+- Token = `v2.<exp>.<HMAC-SHA256("hunter:uid:{userId}:{exp}", AUTH_SECRET or SITE_PASSWORD)>` — expiring and uid-bound (`lib/session-token.ts`)
+- `proxy.ts` (Next 16 middleware) gates all non-public routes; `(app)/layout.tsx` re-checks the user exists
+- Login/register are rate-limited per IP / email via Redis (`429` + `Retry-After`)
 - Public: `/login`, `/register`, `/api/auth/login`, `/api/auth/register`
 - Passwords: PBKDF2-SHA256 (Web Crypto)
 
