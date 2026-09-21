@@ -336,9 +336,13 @@ export function FetchesView() {
                   ? "border-[rgba(45,212,191,0.35)] bg-[var(--accent-soft)] text-[var(--accent)]"
                   : "border-[var(--border)] text-[var(--text-muted)]",
               )}
-              title={boosted ? "Boosted via ?fetch=more" : "Add ?fetch=more to the URL for up to 10/day"}
+              title={
+                manual.boosted
+                  ? "Boosted"
+                  : "Add ?fetch=more to the URL for up to 10/day"
+              }
             >
-              {boosted && <Zap className="h-3 w-3" />}
+              {manual.boosted && <Zap className="h-3 w-3" />}
               {manual.count} / {manual.limit} manual fetches today
             </span>
           ) : null}

@@ -7,8 +7,10 @@ import { todayIST } from "./plans";
  * (which gates the automatic/eligibility-tracked run). Free-tier tenants
  * get a small number of manual clicks per calendar day (IST); the
  * `?fetch=more` query param on the run request raises that ceiling for the
- * same day. Paid plans and admin are not subject to this counter at all —
- * they keep the existing cadence gate in lib/fetches.ts.
+ * same day, and a "special friend" account (admin-granted) always gets the
+ * boosted ceiling with no param needed. Paid plans and admin are not
+ * subject to this counter at all — they keep the existing cadence gate in
+ * lib/fetches.ts.
  */
 export const MANUAL_FETCH_LIMITS = {
   base: 2,
@@ -57,17 +59,17 @@ export async function incrManualFetchCount(userId: string): Promise<number> {
   }
 }
 
+/** `limit` is the resolved daily ceiling — callers decide base vs boosted vs special-friend. */
 export async function getManualFetchState(
   userId: string,
-  boosted: boolean,
+  limit: number,
 ): Promise<ManualFetchState> {
   const count = await getManualFetchCount(userId);
-  const limit = boosted ? MANUAL_FETCH_LIMITS.boosted : MANUAL_FETCH_LIMITS.base;
   return {
     count,
     limit,
     remaining: Math.max(0, limit - count),
-    boosted,
+    boosted: limit > MANUAL_FETCH_LIMITS.base,
     canRun: count < limit,
     resetsAt: nextMidnightIstIso(),
   };

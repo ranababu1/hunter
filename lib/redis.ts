@@ -125,7 +125,7 @@ export async function checkStorageQuota(
   projectedBytes: number,
 ): Promise<QuotaErrorBody | null> {
   const billing = await getBilling(user.id);
-  const ent = resolveEntitlements(user.role, billing);
+  const ent = resolveEntitlements(user.role, billing, user.isSpecialFriend);
   if (projectedBytes > ent.maxStorageBytes) {
     const usage = await getUsage(user.id);
     return {
@@ -144,7 +144,7 @@ export async function checkCompanyLimit(
   nextCount: number,
 ): Promise<QuotaErrorBody | null> {
   const billing = await getBilling(user.id);
-  const ent = resolveEntitlements(user.role, billing);
+  const ent = resolveEntitlements(user.role, billing, user.isSpecialFriend);
   if (nextCount > ent.maxCompanies) {
     return {
       error: "PLAN_LIMIT",

@@ -204,6 +204,12 @@ export interface User {
   updatedAt: string;
   /** ISO timestamp once the tenant finished onboarding (roles + companies). */
   onboardingCompletedAt?: string;
+  /**
+   * Admin-granted perk, not tied to billing: 100 companies, daily fetch
+   * cadence, 10 manual fetches/day. Never shown publicly — only to the
+   * account itself (its own /api/me) and to the admin managing it.
+   */
+  isSpecialFriend?: boolean;
 }
 
 /** Public user shape (no password hash). */
@@ -215,6 +221,7 @@ export interface PublicUser {
   role: UserRole;
   createdAt: string;
   onboardingCompletedAt?: string;
+  isSpecialFriend?: boolean;
 }
 
 export type FetchCadence = "daily" | "alternate";
@@ -225,6 +232,8 @@ export interface Entitlements {
   maxCompanies: number; // Infinity serialized as -1 for JSON
   maxStorageBytes: number;
   isAdmin: boolean;
+  /** Admin-granted perk (see User.isSpecialFriend) — never surfaced publicly. */
+  isSpecialFriend: boolean;
   fetchCadence: FetchCadence;
   maxFetchHistory: number; // Infinity serialized as -1 for JSON
   fetchEnabled: boolean;

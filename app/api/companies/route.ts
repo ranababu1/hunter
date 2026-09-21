@@ -75,7 +75,7 @@ export async function GET() {
   const { companies, fromSeed, redisAvailable } = await getCompanies(user.id);
   const billing = await getBilling(user.id);
   const entitlements = entitlementsForJson(
-    resolveEntitlements(user.role, billing),
+    resolveEntitlements(user.role, billing, user.isSpecialFriend),
   );
   return NextResponse.json(
     {

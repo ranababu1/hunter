@@ -124,6 +124,7 @@ export function toPublicUser(u: User): PublicUser {
     role: u.role,
     createdAt: u.createdAt,
     onboardingCompletedAt: u.onboardingCompletedAt,
+    isSpecialFriend: u.isSpecialFriend,
   };
 }
 
@@ -207,7 +208,7 @@ export async function getMePayload(user: User) {
   const billing = billingRaw ?? (
     user.role === "admin" ? adminBilling() : null
   );
-  const entitlements = resolveEntitlements(user.role, billing);
+  const entitlements = resolveEntitlements(user.role, billing, user.isSpecialFriend);
   const usage = usageRaw ?? {
     bytesUsed: 0,
     updatedAt: new Date().toISOString(),
