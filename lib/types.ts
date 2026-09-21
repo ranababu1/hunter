@@ -150,6 +150,10 @@ export interface FetchRun {
   /** catalog | seed — Phase 2 matches against global jobs/fetches JSON (no live crawler). */
   source?: "catalog" | "seed";
   companyResults: CompanyFetch[];
+  /** true while a background retry pass (scheduled via after()) is still running for this run */
+  pendingRetry?: boolean;
+  /** ISO timestamp once a background retry pass finished */
+  retriesCompletedAt?: string;
 }
 
 export type CompanyPriority = "high" | "medium" | "low";

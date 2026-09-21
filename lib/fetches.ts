@@ -1,4 +1,5 @@
 import { randomUUID } from "crypto";
+import { after } from "next/server";
 import type {
   CompanyFetch,
   CompanyProfile,
@@ -6,7 +7,13 @@ import type {
   Job,
   UserProfile,
 } from "./types";
-import { getUserJobs } from "./jobs";
+import {
+  getUserDailyDigest,
+  getUserJobs,
+  mergeJobsById,
+  saveUserDailyDigest,
+  saveUserJobs,
+} from "./jobs";
 import { getCompanies } from "./redis";
 import {
   getBilling,
@@ -18,29 +25,18 @@ import {
 } from "./users";
 import {
   canRunFetchToday,
+  isPaidCompanyPlan,
   nextEligibleFetchDate,
   resolveEntitlements,
   todayIST,
 } from "./plans";
+import { getManualFetchState, incrManualFetchCount } from "./fetch-quota";
+import { mapPool } from "./companies";
+import { classifyMatch, computeJobId, fetchCompanyLive, type LiveJob } from "./live-fetch";
 import type { User } from "./types";
 import { recomputeAndStoreUsage } from "./redis";
 
-function normalizeName(s: string): string {
-  return s.trim().toLowerCase().replace(/[ ]+/g, " ");
-}
-
-/** Soft company name match (handles "Amazon / AWS" vs "Amazon"). */
-function companyNamesMatch(a: string, b: string): boolean {
-  const na = normalizeName(a);
-  const nb = normalizeName(b);
-  if (na === nb) return true;
-  if (na.includes(nb) || nb.includes(na)) return true;
-  const partsA = na.split(/[/|&]+/).map((p) => p.trim()).filter(Boolean);
-  const partsB = nb.split(/[/|&]+/).map((p) => p.trim()).filter(Boolean);
-  return partsA.some((pa) =>
-    partsB.some((pb) => pa === pb || pa.includes(pb) || pb.includes(pa)),
-  );
-}
+const FETCH_CONCURRENCY = 4;
 
 function extractKeywords(profile: UserProfile): string[] {
   const fromRoles = profile.targetRoles.map((r) => r.label.toLowerCase());
@@ -57,25 +53,172 @@ function extractKeywords(profile: UserProfile): string[] {
   return [...set];
 }
 
-function jobMatchesKeywords(job: Job, keywords: string[]): boolean {
-  if (keywords.length === 0) return true; // no filter → count all for company
-  const hay = `${job.role} ${job.aiFocus} ${job.level} ${job.whyMatch}`.toLowerCase();
-  return keywords.some((k) => hay.includes(k));
+function liveJobToJob(
+  company: CompanyProfile,
+  liveJob: LiveJob,
+  keywords: string[],
+  seenIds: Set<string>,
+): Job {
+  const id = computeJobId(company.name, liveJob.url, liveJob.title);
+  const { match, whyMatch } = classifyMatch(liveJob, keywords);
+  return {
+    id,
+    company: company.name,
+    role: liveJob.title,
+    level: "",
+    aiFocus: liveJob.team ?? "",
+    location: liveJob.location || "Not specified",
+    postedOrUpdated: liveJob.postedOrUpdated || todayIST(),
+    match,
+    url: liveJob.url,
+    whyMatch,
+    dateSeen: todayIST(),
+    isNew: !seenIds.has(id),
+  };
+}
+
+/** Fetch-and-normalize one company. Never throws — every path returns a CompanyFetch + jobs. */
+async function fetchOneCompany(
+  company: CompanyProfile,
+  keywords: string[],
+  seenIds: Set<string>,
+): Promise<{ result: CompanyFetch; jobs: Job[]; retryable: boolean }> {
+  const runDate = todayIST();
+  if (!company.careersUrl) {
+    return {
+      result: {
+        company: company.name,
+        careerPortal: "#",
+        jobsFetched: 0,
+        lastFetched: runDate,
+        outcome: "error",
+        issue: "No careers URL set — add one from Companies",
+      },
+      jobs: [],
+      retryable: false,
+    };
+  }
+
+  const live = await fetchCompanyLive(company.careersUrl);
+  const jobs = live.jobs.map((j) => liveJobToJob(company, j, keywords, seenIds));
+  const retryable =
+    live.outcome === "error" && !(live.issue ?? "").toLowerCase().includes("block");
+
+  return {
+    result: {
+      company: company.name,
+      careerPortal: company.careersUrl,
+      jobsFetched: jobs.length,
+      lastFetched: runDate,
+      outcome: live.outcome,
+      issue: live.issue,
+      notes:
+        live.outcome === "ok"
+          ? `Live fetch via ${live.source} — ${jobs.length} open posting(s)`
+          : undefined,
+    },
+    jobs,
+    retryable,
+  };
+}
+
+/** Upsert today's daily digest with newly discovered jobs, merging by id with whatever the day already had (from ingest or an earlier run today). */
+async function upsertTodayDigest(userId: string, runDate: string, newJobs: Job[]): Promise<void> {
+  if (newJobs.length === 0) return;
+  const existing = await getUserDailyDigest(userId, runDate);
+  const jobs = existing ? mergeJobsById(existing.jobs, newJobs) : newJobs;
+  await saveUserDailyDigest(userId, {
+    date: runDate,
+    title: existing?.title ?? `Live fetch — ${runDate}`,
+    jobs,
+  });
+}
+
+function summarizeStatus(results: CompanyFetch[]): FetchRun["status"] {
+  if (results.length === 0) return "skipped";
+  if (results.every((r) => r.outcome === "error")) return "error";
+  if (results.some((r) => r.outcome === "zero" || r.outcome === "error")) return "partial";
+  return "ok";
 }
 
 /**
- * Per-tenant fetch (no external crawler on Vercel): match the user's active
- * companies against the user's OWN ingested jobs (`hunter:u:{id}:jobs`).
- * Nothing global is consulted. Morning ingest (POST /api/ingest/daily)
- * writes the same FetchRun shape.
+ * Re-attempt only the companies that failed with a transient (non-blocking)
+ * error, scheduled via Next's `after()` so it runs once the initial
+ * response has already reached the client. This runs within the same
+ * serverless invocation's remaining execution budget — a short, best-effort
+ * second pass, not a durable background job. A real queue (Vercel Cron /
+ * QStash) would be needed for retries that must survive minutes, which is
+ * out of scope here.
  */
-export async function runUserFetch(user: User): Promise<
-  | { ok: true; run: FetchRun; nextEligibleDate: string }
+async function runBackgroundRetries(
+  userId: string,
+  runId: string,
+  retryCompanies: CompanyProfile[],
+  keywords: string[],
+): Promise<void> {
+  try {
+    const existingJobs = await getUserJobs(userId);
+    const seenIds = new Set(existingJobs.map((j) => j.id));
+
+    const outcomes = await mapPool(retryCompanies, FETCH_CONCURRENCY, (c) =>
+      fetchOneCompany(c, keywords, seenIds),
+    );
+
+    const newJobs = outcomes.flatMap((o) => o.jobs);
+    if (newJobs.length > 0) {
+      const merged = mergeJobsById(existingJobs, newJobs);
+      await saveUserJobs(userId, merged);
+      await upsertTodayDigest(userId, todayIST(), newJobs);
+    }
+
+    const byCompany = new Map(outcomes.map((o) => [o.result.company, o.result]));
+    const runs = await getFetchRuns(userId);
+    const idx = runs.findIndex((r) => r.id === runId);
+    if (idx === -1) return;
+
+    const run = runs[idx];
+    const nextResults = run.companyResults.map((r) => byCompany.get(r.company) ?? r);
+    const jobsFound = nextResults.reduce((sum, r) => sum + r.jobsFetched, 0);
+    const updated: FetchRun = {
+      ...run,
+      companyResults: nextResults,
+      jobsFound,
+      status: summarizeStatus(nextResults),
+      pendingRetry: false,
+      retriesCompletedAt: new Date().toISOString(),
+    };
+    runs[idx] = updated;
+    await saveFetchRuns(userId, runs);
+    await recomputeAndStoreUsage(userId);
+  } catch (err) {
+    console.warn("[hunter] runBackgroundRetries failed:", err);
+  }
+}
+
+/**
+ * Live per-tenant fetch: for each active company, hit the real careers
+ * portal (known ATS API, or schema.org JobPosting data on the page) and
+ * merge whatever is found into the tenant's own job list. See
+ * lib/live-fetch.ts for exactly what this does and does not do.
+ *
+ * Gating differs by plan:
+ * - Paid company plans / admin: the existing cadence gate (daily), tracked
+ *   via lastFetchDate — unchanged from before.
+ * - Free plan: a manual click quota (2/day, 10/day with `boosted`) instead
+ *   of the cadence gate, so free tenants can check more than once every
+ *   other day, but not unboundedly.
+ */
+export async function runUserFetch(
+  user: User,
+  opts: { boosted?: boolean } = {},
+): Promise<
+  | { ok: true; run: FetchRun; nextEligibleDate: string; manualFetch?: { count: number; limit: number; remaining: number } }
   | {
       ok: false;
       status: number;
       error: string;
       nextEligibleDate?: string;
+      manualFetch?: { count: number; limit: number; remaining: number; resetsAt: string };
     }
 > {
   const billing = await getBilling(user.id);
@@ -85,116 +228,100 @@ export async function runUserFetch(user: User): Promise<
     return { ok: false, status: 403, error: "FETCH_DISABLED" };
   }
 
-  const lastFetchDate = await getLastFetchDate(user.id);
-  if (!canRunFetchToday(lastFetchDate, ent.fetchCadence)) {
-    const nextEligibleDate = nextEligibleFetchDate(
-      lastFetchDate,
-      ent.fetchCadence,
-    );
-    return {
-      ok: false,
-      status: 403,
-      error: "FETCH_CADENCE",
-      nextEligibleDate,
-    };
+  const usesCadenceGate = ent.isAdmin || isPaidCompanyPlan(ent.companyPlan);
+  let manualState: Awaited<ReturnType<typeof getManualFetchState>> | null = null;
+
+  if (usesCadenceGate) {
+    const lastFetchDate = await getLastFetchDate(user.id);
+    if (!canRunFetchToday(lastFetchDate, ent.fetchCadence)) {
+      return {
+        ok: false,
+        status: 403,
+        error: "FETCH_CADENCE",
+        nextEligibleDate: nextEligibleFetchDate(lastFetchDate, ent.fetchCadence),
+      };
+    }
+  } else {
+    manualState = await getManualFetchState(user.id, opts.boosted === true);
+    if (!manualState.canRun) {
+      return {
+        ok: false,
+        status: 429,
+        error: "MANUAL_FETCH_LIMIT",
+        manualFetch: manualState,
+      };
+    }
   }
 
   const { companies } = await getCompanies(user.id);
   const active = companies.filter((c) => c.active);
   const profile = await getProfile(user.id);
   const keywords = extractKeywords(profile);
-  const jobs = await getUserJobs(user.id);
+  const existingJobs = await getUserJobs(user.id);
+  const seenIds = new Set(existingJobs.map((j) => j.id));
 
+  const outcomes = await mapPool(active, FETCH_CONCURRENCY, (c) =>
+    fetchOneCompany(c, keywords, seenIds),
+  );
+
+  const newJobs = outcomes.flatMap((o) => o.jobs);
+  const runDateForDigest = todayIST();
+  if (newJobs.length > 0) {
+    const merged = mergeJobsById(existingJobs, newJobs);
+    await saveUserJobs(user.id, merged);
+    await upsertTodayDigest(user.id, runDateForDigest, newJobs);
+  }
+
+  const companyResults = outcomes.map((o) => o.result);
+  const jobsFound = companyResults.reduce((sum, r) => sum + r.jobsFetched, 0);
+  const retryCompanies = active.filter((c, i) => outcomes[i].retryable);
   const runDate = todayIST();
-  const companyResults: CompanyFetch[] = [];
-  let jobsFound = 0;
-
-  for (const company of active) {
-    const matchedJobs = jobs.filter(
-      (j) =>
-        companyNamesMatch(j.company, company.name) &&
-        jobMatchesKeywords(j, keywords),
-    );
-    const count = matchedJobs.length;
-    jobsFound += count;
-
-    let outcome: CompanyFetch["outcome"] = "ok";
-    let issue: string | undefined;
-    let notes: string | undefined;
-
-    if (count > 0) {
-      notes = `Matched ${count} job(s) in your feed against your target roles / resume keywords`;
-    } else if (jobs.length === 0) {
-      outcome = "zero";
-      issue = "No jobs in your feed yet — the next morning ingest will populate it";
-    } else if (company.portalOk === false) {
-      outcome = "error";
-      issue = company.portalIssue
-        ? `Careers portal flagged: ${company.portalIssue}`
-        : "Careers portal flagged as problematic";
-    } else {
-      outcome = "zero";
-      issue = "No jobs from this company in your feed matched your target roles";
-    }
-
-    companyResults.push({
-      company: company.name,
-      careerPortal: company.careersUrl || "#",
-      jobsFetched: count,
-      lastFetched: runDate,
-      outcome,
-      issue,
-      notes,
-    });
-  }
-
-  let status: FetchRun["status"] = "ok";
-  if (active.length === 0) {
-    status = "skipped";
-  } else if (companyResults.every((r) => r.outcome === "error")) {
-    status = "error";
-  } else if (
-    companyResults.some((r) => r.outcome === "zero" || r.outcome === "error")
-  ) {
-    status = "partial";
-  }
 
   const run: FetchRun = {
     id: randomUUID(),
     runDate,
     createdAt: new Date().toISOString(),
-    status,
+    status: summarizeStatus(companyResults),
     cadenceApplied: ent.fetchCadence,
     companiesChecked: active.length,
     jobsFound,
     notes:
       active.length === 0
         ? "No active companies — add companies and mark them active"
-        : `Matched against ${jobs.length} job(s) in your feed · ${keywords.length} keyword(s) from profile`,
+        : `Live fetch across ${active.length} compan${active.length === 1 ? "y" : "ies"}`,
     source: "catalog",
     companyResults,
+    pendingRetry: retryCompanies.length > 0,
   };
 
   const prev = await getFetchRuns(user.id);
-  const next = [run, ...prev];
+  const nextRuns = [run, ...prev];
   const max = ent.maxFetchHistory;
-  const trimmed = Number.isFinite(max) ? next.slice(0, max) : next;
+  const trimmed = Number.isFinite(max) ? nextRuns.slice(0, max) : nextRuns;
 
   const saved = await saveFetchRuns(user.id, trimmed);
   if (!saved) {
-    return {
-      ok: false,
-      status: 503,
-      error: "Failed to save fetch run — Redis required",
-    };
+    return { ok: false, status: 503, error: "Failed to save fetch run — Redis required" };
   }
   await setLastFetchDate(user.id, runDate);
   await recomputeAndStoreUsage(user.id);
+
+  if (!usesCadenceGate) {
+    await incrManualFetchCount(user.id);
+    manualState = await getManualFetchState(user.id, opts.boosted === true);
+  }
+
+  if (retryCompanies.length > 0) {
+    after(() => runBackgroundRetries(user.id, run.id, retryCompanies, keywords));
+  }
 
   return {
     ok: true,
     run,
     nextEligibleDate: nextEligibleFetchDate(runDate, ent.fetchCadence),
+    manualFetch: manualState
+      ? { count: manualState.count, limit: manualState.limit, remaining: manualState.remaining }
+      : undefined,
   };
 }
 
@@ -203,14 +330,12 @@ export async function getFetchesPayload(user: User) {
   const ent = resolveEntitlements(user.role, billing);
   const runs = await getFetchRuns(user.id);
   const lastFetchDate = await getLastFetchDate(user.id);
-  const nextEligibleDate = nextEligibleFetchDate(
-    lastFetchDate,
-    ent.fetchCadence,
-  );
-  const canRun = canRunFetchToday(lastFetchDate, ent.fetchCadence);
+  const nextEligibleDate = nextEligibleFetchDate(lastFetchDate, ent.fetchCadence);
+  const usesCadenceGate = ent.isAdmin || isPaidCompanyPlan(ent.companyPlan);
+  const canRun = usesCadenceGate ? canRunFetchToday(lastFetchDate, ent.fetchCadence) : true;
 
-  // Strictly the tenant's own history. No global seed fallback.
   const latest: FetchRun | null = runs[0] ?? null;
+  const manualFetch = usesCadenceGate ? null : await getManualFetchState(user.id, false);
 
   return {
     runs,
@@ -220,14 +345,12 @@ export async function getFetchesPayload(user: User) {
     nextEligibleDate,
     canRun,
     cadence: ent.fetchCadence,
-    maxFetchHistory: Number.isFinite(ent.maxFetchHistory)
-      ? ent.maxFetchHistory
-      : -1,
+    usesCadenceGate,
+    manualFetch,
+    maxFetchHistory: Number.isFinite(ent.maxFetchHistory) ? ent.maxFetchHistory : -1,
     entitlements: {
       fetchCadence: ent.fetchCadence,
-      maxFetchHistory: Number.isFinite(ent.maxFetchHistory)
-        ? ent.maxFetchHistory
-        : -1,
+      maxFetchHistory: Number.isFinite(ent.maxFetchHistory) ? ent.maxFetchHistory : -1,
       fetchEnabled: ent.fetchEnabled,
       isAdmin: ent.isAdmin,
     },
