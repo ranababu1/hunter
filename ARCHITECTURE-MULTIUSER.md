@@ -114,6 +114,29 @@ Client IP comes from `x-forwarded-for` (first hop) then `x-real-ip`.
 - The wizard writes only to the caller's keys; company limit and storage quota return `402` with `field` so the
   UI can jump to the offending step.
 
+## Resume upload (`lib/resume-extract.ts`, `lib/resume-limits.ts`)
+
+- `POST /api/profile/resume` (multipart/form-data, one `file` field) — the only real file-upload surface in
+  the app. `lib/resume-limits.ts` holds format/size constants shared with the client (pure, no Node built-ins,
+  safe to import from `"use client"` code); `lib/resume-extract.ts` holds the actual parsers and must stay
+  server-only (`pdf-parse` / `mammoth` / `word-extractor` pull in `fs`/`zlib`, which cannot bundle for the
+  browser — importing it from a client component breaks the build).
+- **Hard cap: 500 KB** (`MAX_RESUME_UPLOAD_BYTES`), enforced both client-side (before the upload even starts)
+  and server-side (authoritative — a client check alone can't be trusted). Oversized files get `413` before
+  any parsing is attempted.
+- Accepted: `.pdf`, `.doc`, `.docx`, `.txt` (`ACCEPTED_RESUME_EXTENSIONS`), detected by extension first, mime
+  type as fallback. Anything else → `400`.
+- Extraction: `pdf-parse` (PDF), `mammoth` (DOCX), `word-extractor` (legacy OLE `.doc`), plain UTF-8 decode
+  (`.txt`). A corrupt/password-protected/scanned-image file fails extraction gracefully → `422` with a
+  specific message, never a crash.
+- **pdf-parse worker gotcha**: `pdf-parse` v2 wraps pdf.js, which needs a worker script; Next's bundler
+  relocates/transforms server code, breaking pdf.js's own relative worker lookup ("Setting up fake worker
+  failed"). Fixed by (1) `next.config.ts` → `serverExternalPackages: ["pdf-parse"]` so Next ships it as a
+  plain `node_modules` package instead of bundling it, and (2) importing `pdf-parse/worker`'s `getPath()` and
+  calling `PDFParse.setWorker(getPath())` before any parse call.
+- Extracted text is truncated to the same 200,000-char cap as pasted resume text, then goes through the normal
+  storage-quota check (`checkStorageQuota` / `projectedBytesWithProfile`) before saving.
+
 ## Plans / entitlements
 ## Plans / entitlements
 
@@ -218,7 +241,8 @@ Extended entitlements (Phase 2):
 | GET | `/api/me` | user + entitlements + usage + billing; **promotes admin** |
 | GET/POST/PUT/DELETE | `/api/companies` | User-scoped; enforces limits |
 | GET/PATCH | `/api/state` | User-scoped visited/status |
-| GET/PUT | `/api/profile` | Resume + target roles + locations + experience level + phone/name |
+| GET/PUT | `/api/profile` | Resume text (paste) + target roles + locations + experience level + phone/name |
+| POST | `/api/profile/resume` | Resume **file** upload (PDF/DOC/DOCX/TXT, 500 KB cap) → server-side text extraction, saved onto the caller’s profile |
 | GET/POST | `/api/onboarding` | GET status + plan limits; POST `{ targetRoles, locations?, experienceLevel?, resumeText?, companies:[{name, careersUrl?}] }` → saves profile + companies (plan/quota enforced), stamps `onboardingCompletedAt` |
 | GET | `/api/fetches` | Per-user runs + cadence (no seed fallback) |
 | POST | `/api/fetches/run` | Live fetch of active companies’ real portals; `?fetch=more` boosts the free-plan manual quota to 10/day |
@@ -298,6 +322,5 @@ GET `/api/me`, `/api/companies`, `/api/fetches` set `Cache-Control: private, max
 - Live career-portal crawler per tenant — shipped (Greenhouse/Lever/Ashby/SmartRecruiters/Workday adapters + schema.org JobPosting fallback, `lib/live-fetch.ts`); ingest path also still live for morning bulk publish
 - A durable retry queue (Vercel Cron / QStash) for portals that stay down past the in-request retry window
 - Remove `data/*.json` once the admin migration flag is confirmed set in prod
-- True PDF parsing quality
 - Stripe SDK + live checkout
 - Email verification

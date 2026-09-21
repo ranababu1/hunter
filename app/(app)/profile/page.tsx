@@ -3,6 +3,10 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { Plus, X, Upload } from "lucide-react";
 import type { TargetRole, UserProfile } from "@/lib/types";
+import {
+  ACCEPTED_RESUME_EXTENSIONS,
+  MAX_RESUME_UPLOAD_BYTES,
+} from "@/lib/resume-limits";
 import { EXPERIENCE_LEVELS } from "@/lib/types";
 import { QuotaBanner } from "@/components/QuotaBanner";
 import { useMe } from "@/components/MeProvider";
@@ -16,6 +20,7 @@ export default function ProfilePage() {
   const [locationInput, setLocationInput] = useState("");
   const [level, setLevel] = useState("");
   const [resumeText, setResumeText] = useState("");
+  const [uploading, setUploading] = useState(false);
   const [roles, setRoles] = useState<TargetRole[]>([]);
   const [roleInput, setRoleInput] = useState("");
   const [loading, setLoading] = useState(true);
@@ -74,15 +79,59 @@ export default function ProfilePage() {
 
   async function onFile(file: File | null) {
     if (!file) return;
-    if (file.type === "application/pdf" || file.name.endsWith(".pdf")) {
+    setError(null);
+    setMessage(null);
+
+    const lower = file.name.toLowerCase();
+    const looksSupported = ACCEPTED_RESUME_EXTENSIONS.some((ext) =>
+      lower.endsWith(ext),
+    );
+    if (!looksSupported) {
       setError(
-        "PDF upload is limited in Phase 1 — paste text or upload a .txt file.",
+        `Unsupported file type. Upload one of: ${ACCEPTED_RESUME_EXTENSIONS.join(", ")}.`,
       );
       return;
     }
-    const text = await file.text();
-    setResumeText(text.slice(0, 200_000));
-    setMessage(`Loaded ${file.name} (${text.length} chars)`);
+    if (file.size > MAX_RESUME_UPLOAD_BYTES) {
+      setError(
+        `File is too large — resumes are capped at ${Math.round(
+          MAX_RESUME_UPLOAD_BYTES / 1024,
+        )} KB. This one is ${Math.ceil(file.size / 1024)} KB.`,
+      );
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      // No Content-Type header — the browser sets the multipart boundary itself.
+      const res = await fetch("/api/profile/resume", {
+        method: "POST",
+        body: form,
+      });
+      const data = (await res.json()) as {
+        error?: string;
+        message?: string;
+        profile?: UserProfile;
+      };
+      if (!res.ok) {
+        setError(data.message ?? data.error ?? "Upload failed");
+        return;
+      }
+      if (data.profile) {
+        setProfile(data.profile);
+        setResumeText(data.profile.resumeText);
+      }
+      setMessage(
+        `Loaded ${file.name} (${data.profile?.resumeText.length ?? 0} chars)`,
+      );
+      await refreshMe();
+    } catch {
+      setError("Network error uploading resume");
+    } finally {
+      setUploading(false);
+    }
   }
 
   async function onSave(e: FormEvent) {
@@ -187,12 +236,18 @@ export default function ProfilePage() {
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
             <span className="eyebrow">Resume</span>
-            <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-[var(--border)] px-3 py-1 text-xs text-[var(--text-muted)] hover:text-[var(--text)]">
+            <label
+              className={
+                "inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-[var(--border)] px-3 py-1 text-xs text-[var(--text-muted)] hover:text-[var(--text)]" +
+                (uploading ? " pointer-events-none opacity-50" : "")
+              }
+            >
               <Upload className="h-3 w-3" />
-              Upload .txt
+              {uploading ? "Uploading…" : "Upload PDF/DOC/DOCX/TXT"}
               <input
                 type="file"
-                accept=".txt,text/plain"
+                accept=".pdf,.doc,.docx,.txt,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/plain"
+                disabled={uploading}
                 className="hidden"
                 onChange={(e) => void onFile(e.target.files?.[0] ?? null)}
               />
@@ -210,6 +265,7 @@ export default function ProfilePage() {
             {profile?.resumeMeta?.fileName
               ? ` · ${profile.resumeMeta.fileName}`
               : ""}
+            {" · "}max {Math.round(MAX_RESUME_UPLOAD_BYTES / 1024)} KB per upload
           </p>
         </div>
 

@@ -107,6 +107,13 @@ polls and toasts when a run finishes.
 Free-plan tenants get a manual quota instead of the cadence gate: 2 runs/day, or 10/day with `?fetch=more` on
 the run request. Paid plans and admin keep the existing daily cadence gate.
 
+## Resume upload
+
+Profile → Upload accepts PDF, DOC, DOCX, or TXT, capped at 500 KB (client- and server-checked). Text is
+extracted server-side (`pdf-parse` / `mammoth` / `word-extractor`) and saved onto the profile; corrupt or
+scanned-image files fail with a clear message instead of a crash. `next.config.ts` marks `pdf-parse` as a
+`serverExternalPackage` — required for its pdf.js worker to resolve under Vercel.
+
 ## Auth
 
 - Cookies: `hunter_uid` + `hunter_session` (httpOnly, sameSite=lax, secure in prod, 30 days)
