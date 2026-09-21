@@ -542,6 +542,8 @@ export type AdminUserPatch = {
   role?: "user" | "admin";
   companyPlan?: BillingAccount["companyPlan"];
   storagePlan?: BillingAccount["storagePlan"];
+  /** Admin-granted perk — 100 companies, daily cadence, 10 manual fetches/day. Never public. */
+  isSpecialFriend?: boolean;
 };
 
 /**
@@ -579,6 +581,10 @@ export async function adminUpdateUser(
   }
   if (patch.role !== undefined) {
     user.role = patch.role;
+    userChanged = true;
+  }
+  if (patch.isSpecialFriend !== undefined) {
+    user.isSpecialFriend = patch.isSpecialFriend;
     userChanged = true;
   }
   if (userChanged) {

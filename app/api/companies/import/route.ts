@@ -110,7 +110,7 @@ export async function POST(request: Request) {
 
   const { companies, redisAvailable } = await getCompanies(user.id);
   const billing = await getBilling(user.id);
-  const resolvedEntitlements = resolveEntitlements(user.role, billing);
+  const resolvedEntitlements = resolveEntitlements(user.role, billing, user.isSpecialFriend);
   const entitlements = entitlementsForJson(resolvedEntitlements);
   const initial: ImportResult = {
     companies,

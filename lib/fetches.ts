@@ -30,7 +30,7 @@ import {
   resolveEntitlements,
   todayIST,
 } from "./plans";
-import { getManualFetchState, incrManualFetchCount } from "./fetch-quota";
+import { MANUAL_FETCH_LIMITS, getManualFetchState, incrManualFetchCount } from "./fetch-quota";
 import { mapPool } from "./companies";
 import { classifyMatch, computeJobId, fetchCompanyLive, type LiveJob } from "./live-fetch";
 import type { User } from "./types";
@@ -222,13 +222,19 @@ export async function runUserFetch(
     }
 > {
   const billing = await getBilling(user.id);
-  const ent = resolveEntitlements(user.role, billing);
+  const ent = resolveEntitlements(user.role, billing, user.isSpecialFriend);
 
   if (!ent.fetchEnabled) {
     return { ok: false, status: 403, error: "FETCH_DISABLED" };
   }
 
   const usesCadenceGate = ent.isAdmin || isPaidCompanyPlan(ent.companyPlan);
+  // Special friends always get the boosted ceiling — no ?fetch=more needed.
+  const manualLimit = ent.isSpecialFriend
+    ? MANUAL_FETCH_LIMITS.boosted
+    : opts.boosted === true
+      ? MANUAL_FETCH_LIMITS.boosted
+      : MANUAL_FETCH_LIMITS.base;
   let manualState: Awaited<ReturnType<typeof getManualFetchState>> | null = null;
 
   if (usesCadenceGate) {
@@ -242,7 +248,7 @@ export async function runUserFetch(
       };
     }
   } else {
-    manualState = await getManualFetchState(user.id, opts.boosted === true);
+    manualState = await getManualFetchState(user.id, manualLimit);
     if (!manualState.canRun) {
       return {
         ok: false,
@@ -308,7 +314,7 @@ export async function runUserFetch(
 
   if (!usesCadenceGate) {
     await incrManualFetchCount(user.id);
-    manualState = await getManualFetchState(user.id, opts.boosted === true);
+    manualState = await getManualFetchState(user.id, manualLimit);
   }
 
   if (retryCompanies.length > 0) {
@@ -327,7 +333,7 @@ export async function runUserFetch(
 
 export async function getFetchesPayload(user: User) {
   const billing = await getBilling(user.id);
-  const ent = resolveEntitlements(user.role, billing);
+  const ent = resolveEntitlements(user.role, billing, user.isSpecialFriend);
   const runs = await getFetchRuns(user.id);
   const lastFetchDate = await getLastFetchDate(user.id);
   const nextEligibleDate = nextEligibleFetchDate(lastFetchDate, ent.fetchCadence);
@@ -335,7 +341,12 @@ export async function getFetchesPayload(user: User) {
   const canRun = usesCadenceGate ? canRunFetchToday(lastFetchDate, ent.fetchCadence) : true;
 
   const latest: FetchRun | null = runs[0] ?? null;
-  const manualFetch = usesCadenceGate ? null : await getManualFetchState(user.id, false);
+  const displayManualLimit = ent.isSpecialFriend
+    ? MANUAL_FETCH_LIMITS.boosted
+    : MANUAL_FETCH_LIMITS.base;
+  const manualFetch = usesCadenceGate
+    ? null
+    : await getManualFetchState(user.id, displayManualLimit);
 
   return {
     runs,

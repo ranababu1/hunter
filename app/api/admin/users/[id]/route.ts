@@ -66,6 +66,12 @@ export async function PATCH(
     }
     patch.storagePlan = body.storagePlan as StoragePlanId;
   }
+  if (body.isSpecialFriend !== undefined) {
+    if (typeof body.isSpecialFriend !== "boolean") {
+      return NextResponse.json({ error: "isSpecialFriend must be boolean" }, { status: 400 });
+    }
+    patch.isSpecialFriend = body.isSpecialFriend;
+  }
 
   const result = await adminUpdateUser(id, patch, isAdminEmail);
   if (!result.ok) {

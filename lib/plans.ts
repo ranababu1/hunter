@@ -92,6 +92,7 @@ export function isPaidCompanyPlan(planId: CompanyPlanId): boolean {
 export function resolveEntitlements(
   role: UserRole,
   billing: BillingAccount | null | undefined,
+  isSpecialFriend = false,
 ): Entitlements {
   const isAdmin = role === "admin";
   if (isAdmin) {
@@ -101,6 +102,7 @@ export function resolveEntitlements(
       maxCompanies: Number.POSITIVE_INFINITY,
       maxStorageBytes: 10 * MB,
       isAdmin: true,
+      isSpecialFriend: false,
       fetchCadence: "daily",
       maxFetchHistory: Number.POSITIVE_INFINITY,
       fetchEnabled: true,
@@ -112,18 +114,25 @@ export function resolveEntitlements(
   const storagePlan: StoragePlanId =
     b.storagePlan === "unlimited" ? "free" : b.storagePlan;
 
-  const isPaidCompany = PAID_COMPANY_PLANS.includes(companyPlan);
+  // Special friend is an admin-granted perk, independent of billing: same
+  // ceilings as the top company plan (100 companies, daily cadence,
+  // unlimited history) without changing the displayed plan/price.
+  const isPaidCompany = PAID_COMPANY_PLANS.includes(companyPlan) || isSpecialFriend;
   const fetchCadence: FetchCadence = isPaidCompany ? "daily" : "alternate";
   const maxFetchHistory = isPaidCompany
     ? Number.POSITIVE_INFINITY
     : 30;
+  const maxCompanies = isSpecialFriend
+    ? COMPANY_LIMITS.cos_100
+    : COMPANY_LIMITS[companyPlan];
 
   return {
     companyPlan,
     storagePlan,
-    maxCompanies: COMPANY_LIMITS[companyPlan],
+    maxCompanies,
     maxStorageBytes: STORAGE_LIMITS[storagePlan],
     isAdmin: false,
+    isSpecialFriend,
     fetchCadence,
     maxFetchHistory,
     fetchEnabled: true,

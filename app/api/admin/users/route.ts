@@ -37,7 +37,7 @@ export async function GET() {
           getFetchRuns(u.id),
           getLastFetchDate(u.id),
         ]);
-      const e = resolveEntitlements(u.role, billing);
+      const e = resolveEntitlements(u.role, billing, u.isSpecialFriend);
       const companyPlan = e.companyPlan;
       const storagePlan = e.storagePlan;
       const bytesUsed = usage?.bytesUsed ?? 0;
@@ -47,6 +47,7 @@ export async function GET() {
         email: u.email,
         phone: u.phone ?? "",
         role: u.role,
+        isSpecialFriend: u.isSpecialFriend ?? false,
         companyPlan,
         storagePlan,
         planLabel: `${companyPlanLabel(companyPlan)} · ${storagePlanLabel(storagePlan)}`,

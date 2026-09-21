@@ -10,6 +10,7 @@ type AdminUserRow = {
   email: string;
   phone: string;
   role: string;
+  isSpecialFriend: boolean;
   companyPlan: string;
   storagePlan: string;
   planLabel: string;
@@ -50,6 +51,7 @@ type EditForm = {
   role: string;
   companyPlan: string;
   storagePlan: string;
+  isSpecialFriend: boolean;
 };
 
 function EditUserModal({
@@ -67,6 +69,7 @@ function EditUserModal({
     role: row.role,
     companyPlan: row.companyPlan === "unlimited" ? "free" : row.companyPlan,
     storagePlan: row.storagePlan === "unlimited" ? "free" : row.storagePlan,
+    isSpecialFriend: row.isSpecialFriend,
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -185,6 +188,26 @@ function EditUserModal({
                 </option>
               ))}
             </select>
+          </label>
+
+          <label className="flex items-start gap-2.5 rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 py-2.5">
+            <input
+              type="checkbox"
+              checked={form.isSpecialFriend}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, isSpecialFriend: e.target.checked }))
+              }
+              className="mt-0.5 h-4 w-4 accent-[var(--accent)]"
+            />
+            <span className="text-sm">
+              <span className="font-medium text-[var(--text)]">Special friend</span>
+              <span className="mt-0.5 block text-xs text-[var(--text-dim)]">
+                Grants 100 companies, daily fetch cadence, and 10 manual
+                fetches/day — regardless of billing plan. Never shown
+                publicly; the account sees it as &ldquo;Extra benefits for
+                friends&rdquo; on their own profile.
+              </span>
+            </span>
           </label>
         </div>
 
@@ -395,6 +418,14 @@ export function UsersView() {
                       {row.role === "admin" && (
                         <span className="ml-2 rounded-full bg-[var(--accent-soft)] px-1.5 py-0.5 text-[0.65rem] font-semibold uppercase text-[var(--accent)]">
                           admin
+                        </span>
+                      )}
+                      {row.isSpecialFriend && (
+                        <span
+                          className="ml-2 rounded-full border border-[rgba(45,212,191,0.35)] px-1.5 py-0.5 text-[0.65rem] font-semibold uppercase text-[var(--accent)]"
+                          title="Special friend: 100 companies, daily cadence, 10 manual fetches/day"
+                        >
+                          friend
                         </span>
                       )}
                     </td>

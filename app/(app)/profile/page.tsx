@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import { Plus, X, Upload } from "lucide-react";
+import { Plus, X, Upload, Sparkles } from "lucide-react";
 import type { TargetRole, UserProfile } from "@/lib/types";
 import {
   ACCEPTED_RESUME_EXTENSIONS,
@@ -204,6 +204,16 @@ export default function ProfilePage() {
           Resume text and target roles for matching. Stored per-user in Redis.
         </p>
       </div>
+
+      {me?.user.isSpecialFriend && (
+        <div className="flex items-center gap-2 rounded-xl border border-[rgba(45,212,191,0.35)] bg-[var(--accent-soft)] px-4 py-2.5 text-sm text-[var(--accent)]">
+          <Sparkles className="h-4 w-4 shrink-0" />
+          <span>
+            <strong>Extra benefits for friends</strong> — 100 companies, daily
+            fetch cadence, and 10 manual fetches a day.
+          </span>
+        </div>
+      )}
 
       {me && (
         <QuotaBanner

@@ -281,7 +281,7 @@ export async function POST(req: NextRequest) {
   let fetchRunsCount = 0;
   if (body.fetchRun && typeof body.fetchRun === "object") {
     const billing = await getBilling(user.id);
-    const ent = resolveEntitlements(user.role, billing);
+    const ent = resolveEntitlements(user.role, billing, user.isSpecialFriend);
     const run = normalizeFetchRun(
       body.fetchRun,
       date,

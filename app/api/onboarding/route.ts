@@ -69,7 +69,7 @@ export async function GET() {
     getCompanies(user.id),
   ]);
   const entitlements = entitlementsForJson(
-    resolveEntitlements(user.role, billing),
+    resolveEntitlements(user.role, billing, user.isSpecialFriend),
   );
   return NextResponse.json({
     user: toPublicUser(user),
@@ -180,7 +180,7 @@ export async function POST(request: Request) {
       { status: 503 },
     );
   }
-  const ent = resolveEntitlements(user.role, billing);
+  const ent = resolveEntitlements(user.role, billing, user.isSpecialFriend);
 
   // Merge companies into whatever the tenant already has (idempotent by name).
   const existing = companiesResult.companies;
