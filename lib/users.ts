@@ -490,6 +490,115 @@ export async function getLastFetchDate(userId: string): Promise<string | null> {
   }
 }
 
+/**
+ * Permanently delete a tenant: the user record, the email index, the id
+ * index, and every `hunter:u:{id}:*` key (companies, profile, billing,
+ * usage, fetch history, ingested jobs, every daily digest, dailyDates
+ * index). Frees any storage quota the tenant was holding. Irreversible.
+ */
+export async function deleteUser(userId: string): Promise<boolean> {
+  const redis = getRedis();
+  if (!redis) return false;
+  try {
+    const user = await getUserById(userId);
+    const keys = u(userId);
+
+    const dailyDates = (await redis.smembers(keys.dailyDates)) as string[];
+    const dailyKeys = (dailyDates ?? []).map((d) => keys.daily(d));
+
+    const toDelete = [
+      userKey(userId),
+      keys.companies,
+      keys.visited,
+      keys.status,
+      keys.profile,
+      keys.usage,
+      keys.billing,
+      keys.fetchRuns,
+      keys.lastFetchDate,
+      keys.importHashes,
+      keys.jobs,
+      keys.dailyDates,
+      ...dailyKeys,
+    ];
+    if (toDelete.length > 0) {
+      await redis.del(...(toDelete as [string, ...string[]]));
+    }
+    if (user) {
+      await redis.hdel(GLOBAL.usersByEmail, user.email.toLowerCase());
+    }
+    await redis.srem(GLOBAL.userIds, userId);
+    invalidateUser(userId);
+    return true;
+  } catch (err) {
+    console.warn("[hunter] deleteUser failed:", err);
+    return false;
+  }
+}
+
+export type AdminUserPatch = {
+  name?: string;
+  phone?: string;
+  role?: "user" | "admin";
+  companyPlan?: BillingAccount["companyPlan"];
+  storagePlan?: BillingAccount["storagePlan"];
+};
+
+/**
+ * Admin-only edit of another tenant: name/phone on the user record, plan
+ * fields on billing. Refuses to demote the protected owner account
+ * (isAdminEmail) away from admin — ensureAdminPrivileges would just
+ * re-promote it on next request anyway, so blocking here avoids a
+ * confusing UI flash.
+ */
+export async function adminUpdateUser(
+  targetId: string,
+  patch: AdminUserPatch,
+  isProtectedEmail: (email: string) => boolean,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await getUserById(targetId);
+  if (!user) return { ok: false, error: "User not found" };
+
+  if (
+    patch.role !== undefined &&
+    patch.role !== "admin" &&
+    isProtectedEmail(user.email)
+  ) {
+    return { ok: false, error: "Cannot demote the protected admin account" };
+  }
+
+  let userChanged = false;
+  if (patch.name !== undefined) {
+    user.name = patch.name.trim().slice(0, 120) || user.name;
+    userChanged = true;
+  }
+  if (patch.phone !== undefined) {
+    const p = patch.phone.trim().slice(0, 40);
+    user.phone = p || undefined;
+    userChanged = true;
+  }
+  if (patch.role !== undefined) {
+    user.role = patch.role;
+    userChanged = true;
+  }
+  if (userChanged) {
+    user.updatedAt = new Date().toISOString();
+    const ok = await createUser(user);
+    if (!ok) return { ok: false, error: "Failed to save user" };
+  }
+
+  if (patch.companyPlan !== undefined || patch.storagePlan !== undefined) {
+    const billing = (await getBilling(targetId)) ?? { ...DEFAULT_BILLING };
+    if (patch.companyPlan !== undefined) billing.companyPlan = patch.companyPlan;
+    if (patch.storagePlan !== undefined) billing.storagePlan = patch.storagePlan;
+    const ok = await setBilling(targetId, billing);
+    if (!ok) return { ok: false, error: "Failed to save billing" };
+  }
+
+  invalidateUser(targetId);
+  return { ok: true };
+}
+
 export async function setLastFetchDate(
   userId: string,
   date: string,

@@ -15,7 +15,11 @@ import {
   Target,
   X,
 } from "lucide-react";
-import { EXPERIENCE_LEVELS } from "@/lib/types";
+import {
+  CONSULTING_PRESETS,
+  experienceLevelsFor,
+  roleSuggestionsFor,
+} from "@/lib/onboarding-taxonomy";
 
 type Status = {
   completed: boolean;
@@ -29,17 +33,6 @@ type Status = {
 };
 
 type CompanyRow = { name: string; careersUrl: string };
-
-const ROLE_SUGGESTIONS = [
-  "AI Engineer",
-  "GenAI Engineer",
-  "ML Engineer",
-  "Solutions Architect",
-  "Data Scientist",
-  "Applied Scientist",
-  "Engineering Manager",
-  "Product Manager",
-];
 
 const LOCATION_SUGGESTIONS = [
   "Bengaluru",
@@ -174,6 +167,7 @@ export function OnboardingWizard({ userName }: { userName: string }) {
     { name: "", careersUrl: "" },
     { name: "", careersUrl: "" },
   ]);
+  const [presetSelected, setPresetSelected] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -205,9 +199,25 @@ export function OnboardingWizard({ userName }: { userName: string }) {
     };
   }, []);
 
+  // Suggestion rail narrows to the family of the first role picked — e.g.
+  // "Project Manager" swaps the AI/tech-leaning defaults for PM-adjacent roles.
+  const roleSuggestions = useMemo(() => roleSuggestionsFor(roles), [roles]);
+  const levelOptions = useMemo(() => experienceLevelsFor(roles), [roles]);
+
   const maxCompanies = status?.entitlements.maxCompanies ?? 5;
   const unlimited = maxCompanies < 0;
-  const filledCompanies = companies.filter((c) => c.name.trim());
+
+  const manualRows = companies.filter((c) => c.name.trim());
+  const presetRows: CompanyRow[] = CONSULTING_PRESETS.filter((p) =>
+    presetSelected.has(p.name),
+  );
+  // Manual entries win on a name collision (user's own edited URL survives).
+  const filledCompanies = useMemo(() => {
+    const byKey = new Map<string, CompanyRow>();
+    for (const row of presetRows) byKey.set(row.name.toLowerCase(), row);
+    for (const row of manualRows) byKey.set(row.name.toLowerCase(), row);
+    return [...byKey.values()];
+  }, [presetRows, manualRows]);
   const overLimit = !unlimited && filledCompanies.length > maxCompanies;
 
   const stepValid = [
@@ -221,6 +231,15 @@ export function OnboardingWizard({ userName }: { userName: string }) {
     setCompanies((prev) =>
       prev.map((c, idx) => (idx === i ? { ...c, ...patch } : c)),
     );
+  }
+
+  function togglePreset(name: string) {
+    setPresetSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
   }
 
   async function logout() {
@@ -336,13 +355,14 @@ export function OnboardingWizard({ userName }: { userName: string }) {
           </div>
           <p className="text-sm text-[var(--text-muted)]">
             Your daily digest, board and fetch matching are filtered by these.
-            Add at least one.
+            Add at least one — the suggestions below adjust to match your
+            first pick.
           </p>
           <ChipInput
             values={roles}
             onChange={setRoles}
-            suggestions={ROLE_SUGGESTIONS}
-            placeholder="e.g. Staff ML Engineer"
+            suggestions={roleSuggestions}
+            placeholder="e.g. Senior Project Manager"
             max={10}
           />
         </section>
@@ -374,7 +394,7 @@ export function OnboardingWizard({ userName }: { userName: string }) {
               className={inputClass}
             >
               <option value="">Prefer not to say</option>
-              {EXPERIENCE_LEVELS.map((l) => (
+              {levelOptions.map((l) => (
                 <option key={l.id} value={l.id}>
                   {l.label}
                 </option>
@@ -395,7 +415,7 @@ export function OnboardingWizard({ userName }: { userName: string }) {
       )}
 
       {step === 2 && (
-        <section className="space-y-4">
+        <section className="space-y-5">
           <div className="flex items-center gap-2">
             <Building2 className="h-4 w-4 text-[var(--accent)]" />
             <h1 className="prose-title text-xl text-[var(--text)]">
@@ -403,57 +423,92 @@ export function OnboardingWizard({ userName }: { userName: string }) {
             </h1>
           </div>
           <p className="text-sm text-[var(--text-muted)]">
-            Name is required; the careers URL helps the fetcher find the right
-            portal. {unlimited ? "No limit on your plan." : `Your plan tracks up to ${maxCompanies} companies.`}{" "}
+            Pick from top consulting firms or add your own.{" "}
+            {unlimited ? "No limit on your plan." : `Your plan tracks up to ${maxCompanies} companies.`}{" "}
             You can add, import or edit these later.
           </p>
+
           <div className="space-y-2">
-            {companies.map((c, i) => (
-              <div key={i} className="flex flex-col gap-2 sm:flex-row">
-                <input
-                  value={c.name}
-                  onChange={(e) => updateCompany(i, { name: e.target.value })}
-                  placeholder="Company name"
-                  className={clsx(inputClass, "sm:w-2/5")}
-                />
-                <input
-                  value={c.careersUrl}
-                  onChange={(e) =>
-                    updateCompany(i, { careersUrl: e.target.value })
-                  }
-                  placeholder="https://careers.example.com (optional)"
-                  type="url"
-                  className={inputClass}
-                />
-                <button
-                  type="button"
-                  aria-label="Remove row"
-                  onClick={() =>
-                    setCompanies((prev) =>
-                      prev.length > 1
-                        ? prev.filter((_, idx) => idx !== i)
-                        : [{ name: "", careersUrl: "" }],
-                    )
-                  }
-                  className="inline-flex items-center justify-center rounded-xl border border-[var(--border)] px-3 py-2 text-[var(--text-dim)] transition hover:text-[var(--text)]"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            ))}
+            <span className="eyebrow">Top consulting firms</span>
+            <div className="flex flex-wrap gap-2">
+              {CONSULTING_PRESETS.map((p) => {
+                const selected = presetSelected.has(p.name);
+                return (
+                  <button
+                    key={p.name}
+                    type="button"
+                    onClick={() => togglePreset(p.name)}
+                    aria-pressed={selected}
+                    className={clsx(
+                      "inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition",
+                      selected
+                        ? "border-[rgba(45,212,191,0.45)] bg-[var(--accent-soft)] text-[var(--accent)]"
+                        : "border-[var(--border)] text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)]",
+                    )}
+                  >
+                    {selected ? (
+                      <Check className="h-3 w-3" />
+                    ) : (
+                      <Plus className="h-3 w-3" />
+                    )}
+                    {p.name}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-          <div className="flex items-center justify-between">
+
+          <div className="space-y-2">
+            <span className="eyebrow">Or add your own</span>
+            <div className="space-y-2">
+              {companies.map((c, i) => (
+                <div key={i} className="flex flex-col gap-2 sm:flex-row">
+                  <input
+                    value={c.name}
+                    onChange={(e) => updateCompany(i, { name: e.target.value })}
+                    placeholder="Company name"
+                    className={clsx(inputClass, "sm:w-2/5")}
+                  />
+                  <input
+                    value={c.careersUrl}
+                    onChange={(e) =>
+                      updateCompany(i, { careersUrl: e.target.value })
+                    }
+                    placeholder="https://careers.example.com (optional)"
+                    type="url"
+                    className={inputClass}
+                  />
+                  <button
+                    type="button"
+                    aria-label="Remove row"
+                    onClick={() =>
+                      setCompanies((prev) =>
+                        prev.length > 1
+                          ? prev.filter((_, idx) => idx !== i)
+                          : [{ name: "", careersUrl: "" }],
+                      )
+                    }
+                    className="inline-flex items-center justify-center rounded-xl border border-[var(--border)] px-3 py-2 text-[var(--text-dim)] transition hover:text-[var(--text)]"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
             <button
               type="button"
               onClick={() =>
                 setCompanies((prev) => [...prev, { name: "", careersUrl: "" }])
               }
-              disabled={!unlimited && companies.length >= maxCompanies}
+              disabled={!unlimited && filledCompanies.length >= maxCompanies}
               className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] px-3 py-1.5 text-xs text-[var(--text-muted)] transition hover:text-[var(--text)] disabled:opacity-40"
             >
               <Plus className="h-3.5 w-3.5" />
               Add another
             </button>
+          </div>
+
+          <div className="flex items-center justify-end">
             <span
               className={clsx(
                 "text-xs tabular-nums",
@@ -461,7 +516,7 @@ export function OnboardingWizard({ userName }: { userName: string }) {
               )}
             >
               {filledCompanies.length}
-              {unlimited ? "" : ` / ${maxCompanies}`} filled
+              {unlimited ? "" : ` / ${maxCompanies}`} selected
             </span>
           </div>
         </section>
@@ -494,7 +549,7 @@ export function OnboardingWizard({ userName }: { userName: string }) {
                     : "Any location"}
                 </div>
                 <div>
-                  {EXPERIENCE_LEVELS.find((l) => l.id === level)?.label ??
+                  {levelOptions.find((l) => l.id === level)?.label ??
                     "Level not specified"}
                 </div>
                 <div>

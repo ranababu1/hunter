@@ -1,10 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronDown, ExternalLink, Play, RefreshCw } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { ChevronDown, ExternalLink, Play, RefreshCw, Zap } from "lucide-react";
 import clsx from "clsx";
 import type { CompanyFetch, FetchRun } from "@/lib/types";
 import { useMe } from "@/components/MeProvider";
+import { Toast } from "@/components/Toast";
 
 function portalLabel(url: string): string {
   try {
@@ -96,6 +98,15 @@ function FetchTable({
   );
 }
 
+type ManualFetchInfo = {
+  count: number;
+  limit: number;
+  remaining: number;
+  boosted?: boolean;
+  canRun?: boolean;
+  resetsAt?: string;
+} | null;
+
 type FetchesApi = {
   runs: FetchRun[];
   latest: FetchRun | null;
@@ -104,6 +115,8 @@ type FetchesApi = {
   nextEligibleDate: string;
   canRun: boolean;
   cadence: "daily" | "alternate";
+  usesCadenceGate: boolean;
+  manualFetch: ManualFetchInfo;
   maxFetchHistory: number;
   entitlements: {
     fetchCadence: string;
@@ -113,14 +126,24 @@ type FetchesApi = {
   };
 };
 
+const POLL_INTERVAL_MS = 4000;
+const POLL_MAX_TICKS = 20; // ~80s ceiling on the pendingRetry poll
+
 export function FetchesView() {
   const { refreshMe } = useMe();
+  const searchParams = useSearchParams();
+  const boosted = searchParams.get("fetch") === "more";
+
   const [data, setData] = useState<FetchesApi | null>(null);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [issuesOpen, setIssuesOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+
+  const pollTicks = useRef(0);
+  const announcedRunId = useRef<string | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -133,43 +156,87 @@ export function FetchesView() {
       }
       const json = (await res.json()) as FetchesApi;
       setData(json);
-      if (!selectedId && json.latest) setSelectedId(json.latest.id);
+      setSelectedId((prev) => prev ?? json.latest?.id ?? null);
+      return json;
     } catch {
       setError("Network error");
     } finally {
       setLoading(false);
     }
-  }, [selectedId]);
+  }, []);
 
   useEffect(() => {
     void refresh();
+  }, [refresh]);
+
+  // While the latest run still has companies retrying in the background,
+  // poll for the final result and fire a toast once every company that was
+  // checked came back with at least one hit (or the poll window lapses).
+  useEffect(() => {
+    if (!data?.latest?.pendingRetry) return;
+    if (announcedRunId.current === data.latest.id) return;
+
+    pollTicks.current = 0;
+    const interval = setInterval(async () => {
+      pollTicks.current += 1;
+      const json = await refresh();
+      const stillPending = json?.latest?.pendingRetry;
+      if (!stillPending || pollTicks.current >= POLL_MAX_TICKS) {
+        clearInterval(interval);
+        if (json?.latest && announcedRunId.current !== json.latest.id) {
+          announcedRunId.current = json.latest.id;
+          const results = json.latest.companyResults;
+          const allOk = results.length > 0 && results.every((r) => r.jobsFetched > 0);
+          if (allOk) {
+            setToast(
+              `All ${results.length} compan${results.length === 1 ? "y" : "ies"} fetched successfully.`,
+            );
+          } else if (results.some((r) => r.jobsFetched > 0)) {
+            setToast(
+              `Fetch finished — ${results.filter((r) => r.jobsFetched > 0).length} of ${results.length} companies returned postings.`,
+            );
+          }
+        }
+      }
+    }, POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [data?.latest?.id, data?.latest?.pendingRetry]);
 
   async function runFetch() {
     setRunning(true);
     setError(null);
     try {
-      const res = await fetch("/api/fetches/run", { method: "POST" });
+      const res = await fetch(`/api/fetches/run${boosted ? "?fetch=more" : ""}`, {
+        method: "POST",
+      });
       const json = (await res.json()) as {
         error?: string;
         nextEligibleDate?: string;
         run?: FetchRun;
+        manualFetch?: ManualFetchInfo;
       };
       if (!res.ok) {
         if (json.error === "FETCH_CADENCE") {
           setError(
             `Next eligible fetch: ${json.nextEligibleDate ?? "later"} (cadence limit)`,
           );
+        } else if (json.error === "MANUAL_FETCH_LIMIT") {
+          setError(
+            boosted
+              ? `Daily fetch limit reached (${json.manualFetch?.limit ?? 10}/day, even boosted). Resets at midnight IST.`
+              : `You've used today's ${json.manualFetch?.limit ?? 2} free manual fetches. Add ?fetch=more to the URL for up to 10/day, or wait for the reset at midnight IST.`,
+          );
         } else {
           setError(json.error ?? "Fetch failed");
         }
-        // still refresh to sync nextEligible
-        const r2 = await fetch("/api/fetches");
-        if (r2.ok) setData((await r2.json()) as FetchesApi);
+        await refresh();
         return;
       }
-      if (json.run) setSelectedId(json.run.id);
+      if (json.run) {
+        setSelectedId(json.run.id);
+        if (!json.run.pendingRetry) announcedRunId.current = json.run.id;
+      }
       await refresh();
       await refreshMe();
     } catch {
@@ -226,6 +293,7 @@ export function FetchesView() {
     maxHist < 0
       ? "Unlimited fetch history"
       : `History retains last ${maxHist} runs (free plan)`;
+  const manual = data?.manualFetch ?? null;
 
   const chips = [
     { label: "Companies checked", value: counts.checked },
@@ -241,22 +309,39 @@ export function FetchesView() {
           <div className="eyebrow mb-2">Coverage</div>
           <h1 className="prose-title text-3xl sm:text-4xl">Fetch details</h1>
           <p className="mt-2 max-w-2xl text-sm text-[var(--text-muted)]">
-            Per-user fetch history. Phase 2 matches your active companies
-            against the global jobs catalog (no live crawler on Vercel). Morning
-            agent will write the same run shape later.
+            Hunter visits each active company&apos;s real careers portal —
+            known ATS platforms via their own public job-board data, others
+            via structured job listings on the page — and merges what it
+            finds into your feed. Portals that block automated requests are
+            reported honestly, not faked.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <span
-            className={clsx(
-              "rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-wide",
-              cadence === "daily"
-                ? "border-[rgba(45,212,191,0.35)] bg-[var(--accent-soft)] text-[var(--accent)]"
-                : "border-[var(--border)] text-[var(--text-muted)]",
-            )}
-          >
-            Cadence · {cadence}
-          </span>
+          {data?.usesCadenceGate ? (
+            <span
+              className={clsx(
+                "rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-wide",
+                cadence === "daily"
+                  ? "border-[rgba(45,212,191,0.35)] bg-[var(--accent-soft)] text-[var(--accent)]"
+                  : "border-[var(--border)] text-[var(--text-muted)]",
+              )}
+            >
+              Cadence · {cadence}
+            </span>
+          ) : manual ? (
+            <span
+              className={clsx(
+                "inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium",
+                manual.remaining > 0
+                  ? "border-[rgba(45,212,191,0.35)] bg-[var(--accent-soft)] text-[var(--accent)]"
+                  : "border-[var(--border)] text-[var(--text-muted)]",
+              )}
+              title={boosted ? "Boosted via ?fetch=more" : "Add ?fetch=more to the URL for up to 10/day"}
+            >
+              {boosted && <Zap className="h-3 w-3" />}
+              {manual.count} / {manual.limit} manual fetches today
+            </span>
+          ) : null}
           <button
             type="button"
             onClick={() => void refresh()}
@@ -271,13 +356,15 @@ export function FetchesView() {
             onClick={() => void runFetch()}
             title={
               data && !data.canRun
-                ? `Next eligible: ${data.nextEligibleDate}`
+                ? data.usesCadenceGate
+                  ? `Next eligible: ${data.nextEligibleDate}`
+                  : "Today's manual fetches are used up"
                 : "Run fetch now"
             }
             className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(45,212,191,0.35)] bg-[var(--accent-soft)] px-4 py-1.5 text-sm font-medium text-[var(--accent)] disabled:opacity-50"
           >
             <Play className="h-3.5 w-3.5" />
-            {running ? "Running…" : "Run fetch"}
+            {running ? "Fetching…" : "Run fetch"}
           </button>
         </div>
       </div>
@@ -288,12 +375,23 @@ export function FetchesView() {
           {data.lastFetchDate
             ? ` · Last run ${data.lastFetchDate}`
             : " · No personal runs yet"}
-          {data.canRun
-            ? " · Eligible today"
-            : ` · Next eligible ${data.nextEligibleDate}`}
-          {data.fromSeed && data.runs.length === 0
-            ? " · Showing global seed until you run a fetch"
-            : ""}
+          {data.usesCadenceGate
+            ? data.canRun
+              ? " · Eligible today"
+              : ` · Next eligible ${data.nextEligibleDate}`
+            : manual
+              ? manual.remaining > 0
+                ? ` · ${manual.remaining} manual fetch${manual.remaining === 1 ? "" : "es"} left today`
+                : " · Add ?fetch=more to the page URL for up to 10/day"
+              : ""}
+        </p>
+      )}
+
+      {snapshot?.pendingRetry && (
+        <p className="flex items-center gap-2 text-xs text-[var(--accent)]">
+          <RefreshCw className="h-3 w-3 animate-spin" />
+          Some companies hit a temporary error and are being retried in the
+          background — this list will update automatically.
         </p>
       )}
 
@@ -331,11 +429,7 @@ export function FetchesView() {
       {!snapshot ? (
         <p className="text-sm text-[var(--text-muted)]">
           No fetch data yet. Add active companies and click{" "}
-          <strong>Run fetch</strong>, or ensure{" "}
-          <code className="rounded bg-[var(--bg-elevated)] px-1.5 py-0.5 text-[var(--accent)]">
-            data/fetches.json
-          </code>{" "}
-          exists as a seed catalog.
+          <strong>Run fetch</strong> to check their real careers portals.
         </p>
       ) : (
         <>
@@ -365,14 +459,6 @@ export function FetchesView() {
                 {snapshot.runDate}
               </span>
             </div>
-            {snapshot.source && (
-              <div className="glass flex items-center gap-2 rounded-full px-3.5 py-1.5 text-sm">
-                <span className="text-[var(--text-dim)]">Source</span>
-                <span className="font-semibold text-[var(--accent)]">
-                  {snapshot.source}
-                </span>
-              </div>
-            )}
           </div>
 
           {snapshot.notes && (
@@ -410,7 +496,8 @@ export function FetchesView() {
                   </span>
                 </div>
                 <p className="mt-0.5 text-xs text-[var(--text-muted)]">
-                  Empty boards, closed postings, and fetch blockers from this run
+                  Empty boards, closed postings, and portals that blocked or
+                  errored on this run
                 </p>
               </div>
               <ChevronDown
@@ -428,6 +515,8 @@ export function FetchesView() {
           </section>
         </>
       )}
+
+      {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}
     </div>
   );
 }

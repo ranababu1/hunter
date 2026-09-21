@@ -95,11 +95,26 @@ Client IP comes from `x-forwarded-for` (first hop) then `x-real-ip`.
 ## Onboarding (blank-slate tenants)
 
 - `User.onboardingCompletedAt` gates the app. `isOnboarded(user)` is true for admin or any user with the stamp.
-- Register → `/onboarding` (standalone page, no app shell). Wizard steps: **Roles** (≥1) → **Preferences** (locations, experience level, optional resume text) → **Companies** (≥1, capped at `maxCompanies`) → **Review** → `POST /api/onboarding`.
-- `(app)/layout.tsx` redirects un-onboarded tenants to `/onboarding`. Accounts that pre-date onboarding are grandfathered: if they already have companies or target roles the stamp is written lazily instead of redirecting.
-- `/onboarding` itself redirects completed users to `/`.
-- The wizard writes only to the caller's keys; company limit and storage quota return `402` with `field` so the UI can jump to the offending step.
+- Register → `/onboarding` (standalone page, no app shell). Wizard steps: **Roles** (≥1) → **Preferences**
+  (locations, experience level, optional resume text) → **Companies** (≥1, capped at `maxCompanies`) → **Review**
+  → `POST /api/onboarding`.
+- **Companies step** offers the top 10 global consulting firms (McKinsey, BCG, Bain, Deloitte, Accenture, PwC,
+  EY, KPMG, Capgemini, IBM Consulting — `lib/onboarding-taxonomy.ts` `CONSULTING_PRESETS`) as one-click toggle
+  chips with the careers URL prefilled, alongside free-text rows for any other company. Both contribute to the
+  same plan-capped list; a manually typed name wins over a preset on a name collision.
+- **Roles step** suggestion rail starts cross-functional (`DEFAULT_ROLE_SUGGESTIONS`) and, once a first role is
+  entered, narrows to that role's family (tech, product, design, sales, marketing, finance, HR, consulting,
+  operations, data, project/program) via `roleSuggestionsFor()`. The Experience-level select's top-tier label
+  is similarly reworded per family (`experienceLevelsFor()`) — ids stay the canonical `EXPERIENCE_LEVELS` ids,
+  only the leadership-tier label text changes, so no schema/storage change is involved.
+- `(app)/layout.tsx` redirects un-onboarded tenants to `/onboarding`. Accounts that pre-date onboarding are
+  grandfathered: if they already have companies or target roles the stamp is written lazily instead of
+  redirecting.
+- `/onboarding` itself redirects completed users to `/daily`.
+- The wizard writes only to the caller's keys; company limit and storage quota return `402` with `field` so the
+  UI can jump to the offending step.
 
+## Plans / entitlements
 ## Plans / entitlements
 
 Stored on `billing`:
@@ -142,19 +157,55 @@ Extended entitlements (Phase 2):
 - `bytesUsed` ≈ UTF-8 length of companies + profile + status + visited + fetchRuns + jobs + daily digests JSON; recomputed on each write.
 - Fetch history trimmed to `maxFetchHistory` (30 for free).
 
-## Per-user fetches (Phase 2)
+## Per-user fetches — live fetcher
 
 - Redis `hunter:u:{userId}:fetchRuns` — `FetchRun[]` newest first.
-- `FetchRun`: `{ id, runDate, createdAt, status, cadenceApplied, companiesChecked, jobsFound, notes?, issue?, source?, companyResults }`.
-- `POST /api/fetches/run` matches the user’s **active** companies + profile targetRoles / resume keywords against global `data/jobs.json` + portal metadata from `data/fetches.json` (honest source: `catalog` / `seed`). No external crawler on Vercel.
-- Morning agent / `POST /api/ingest/daily` writes the **same FetchRun shape** (optional `fetchRun` in body).
-- `GET /api/fetches` returns runs + cadence info + `nextEligibleDate`; empty history falls back to seed snapshot.
+- `FetchRun`: `{ id, runDate, createdAt, status, cadenceApplied, companiesChecked, jobsFound, notes?, issue?,
+  source?, companyResults, pendingRetry?, retriesCompletedAt? }`.
+- `POST /api/fetches/run` visits each active company's **real careers portal** (`lib/live-fetch.ts`), not a
+  static catalog. For known ATS platforms it calls the same public JSON endpoint that platform's own careers
+  page loads in a browser: Greenhouse (`boards-api.greenhouse.io`), Lever (`api.lever.co`), Ashby
+  (`api.ashbyhq.com`), SmartRecruiters (`api.smartrecruiters.com`), Workday (`POST …/wday/cxs/{tenant}/{site}/jobs`
+  — note: Workday 400s if `Accept-Language` carries RFC quality values like `en-US,en;q=0.9`; send a bare
+  locale). Everything else gets a plain fetch with realistic browser headers, looking for schema.org
+  `JobPosting` JSON-LD (the same markup search engines read). A response that looks like bot-blocking (403/429,
+  or a Cloudflare/CAPTCHA/"access denied" body signature) is reported as an honest `error`, never faked as
+  success. Newly found postings are merged by a stable content-hash id into the tenant's own `jobs` list
+  (`lib/jobs.ts`) **and** upserted into today's daily digest, so Daily/Board/Kanban all reflect a manual run
+  immediately.
+- **What this deliberately does not do**: solve CAPTCHAs, spoof browser fingerprints to defeat anti-bot
+  challenges, or rotate proxies to evade IP/rate-limit blocks. When a portal is genuinely blocking automated
+  traffic that is surfaced to the user, not worked around.
+- Transient failures (timeout/5xx/429) get up to 3 retries with backoff inside the request; companies still
+  failing after that are retried once more via Next's `after()` **after the response is already sent** — a
+  short best-effort second pass bounded by the same serverless invocation, not a durable background job (a
+  real queue like Vercel Cron/QStash would be needed for retries that must survive minutes). The stored
+  `FetchRun` gets `pendingRetry: true` until that pass finishes and rewrites it with `retriesCompletedAt`.
+  `FetchesView` polls while `pendingRetry` is set and shows a toast once every checked company came back with a
+  hit (or the ~80s poll ceiling lapses).
+- **Gating** differs by plan:
+  - Paid company plans (`cos_20/45/100`) and admin: unchanged cadence gate (`daily`), tracked via
+    `lastFetchDate` — `canRunFetchToday` / `nextEligibleFetchDate`.
+  - Free plan: a **manual click quota** instead of the cadence gate (`lib/fetch-quota.ts`) — `2` runs/day
+    (IST), or `10`/day when the request carries `?fetch=more`. Tracked in
+    `hunter:u:{userId}:manualFetches:{YYYY-MM-DD}` (`INCR` + 48h `EXPIRE`). Over quota → `429`
+    `{ error: "MANUAL_FETCH_LIMIT", manualFetch: { count, limit, remaining, resetsAt } }`.
+- `GET /api/fetches` returns `usesCadenceGate` (which gating mode applies) and, for free-plan tenants,
+  `manualFetch` (today's count/limit/remaining). No seed/global fallback — the tenant's own run history, or
+  nothing.
 
 ## Admin Users
 
 - Nav **Users** (only if `entitlements.isAdmin`).
 - Page `/users` + `GET /api/admin/users` (403 if not admin).
 - Table: name, email, phone, plan labels, companies count, fetch runs count, bytesUsed, last fetch date, createdAt.
+- **Edit** (`PATCH /api/admin/users/{id}`): name, phone, role, companyPlan, storagePlan. Refuses to demote the
+  protected admin-email account away from `admin` (it would just be re-promoted on its next request anyway).
+- **Delete** (`DELETE /api/admin/users/{id}`): permanently removes the user record, the email/id indexes, and
+  every `hunter:u:{id}:*` key — companies, profile, billing, usage, fetch history, ingested jobs, every daily
+  digest and the dailyDates index. Frees any storage the tenant was using. Blocked for self-delete and for any
+  admin-role account (including the protected owner). Irreversible; the UI requires typing the target email to
+  confirm.
 - Full-bleed layout like companies / fetches.
 
 ## APIs
@@ -170,8 +221,10 @@ Extended entitlements (Phase 2):
 | GET/PUT | `/api/profile` | Resume + target roles + locations + experience level + phone/name |
 | GET/POST | `/api/onboarding` | GET status + plan limits; POST `{ targetRoles, locations?, experienceLevel?, resumeText?, companies:[{name, careersUrl?}] }` → saves profile + companies (plan/quota enforced), stamps `onboardingCompletedAt` |
 | GET | `/api/fetches` | Per-user runs + cadence (no seed fallback) |
-| POST | `/api/fetches/run` | Cadence-enforced match of the tenant's active companies against the tenant's own jobs |
+| POST | `/api/fetches/run` | Live fetch of active companies’ real portals; `?fetch=more` boosts the free-plan manual quota to 10/day |
 | GET | `/api/admin/users` | Admin-only user table |
+| PATCH | `/api/admin/users/{id}` | Admin-only edit: name/phone/role/companyPlan/storagePlan |
+| DELETE | `/api/admin/users/{id}` | Admin-only permanent delete (blocked for self/admin accounts) |
 | GET | `/api/admin/contact` | Admin-only contact-form inbox |
 | POST | `/api/contact` | Public contact form → Redis; 5/hour per IP |
 | GET | `/api/billing/plans` | Catalog JSON |
@@ -242,7 +295,8 @@ GET `/api/me`, `/api/companies`, `/api/fetches` set `Cache-Control: private, max
 
 ## Later
 
-- Live career-portal crawler per tenant (ingest path already live; free tenants get nothing until it runs for them)
+- Live career-portal crawler per tenant — shipped (Greenhouse/Lever/Ashby/SmartRecruiters/Workday adapters + schema.org JobPosting fallback, `lib/live-fetch.ts`); ingest path also still live for morning bulk publish
+- A durable retry queue (Vercel Cron / QStash) for portals that stay down past the in-request retry window
 - Remove `data/*.json` once the admin migration flag is confirmed set in prod
 - True PDF parsing quality
 - Stripe SDK + live checkout

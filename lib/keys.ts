@@ -32,5 +32,7 @@ export function u(userId: string) {
     daily: (date: string) => `hunter:u:${userId}:daily:${date}`,
     /** Set of YYYY-MM-DD dates that have digests (list index) */
     dailyDates: `hunter:u:${userId}:dailyDates`,
+    /** Manual "Run fetch" click counter for one IST date (free-plan quota) */
+    manualFetches: (date: string) => `hunter:u:${userId}:manualFetches:${date}`,
   };
 }

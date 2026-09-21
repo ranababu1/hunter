@@ -59,7 +59,7 @@ Billing UI + `/api/billing/checkout|webhook` remain **501 stubs** (Stripe not in
 
 ## Daily / morning publish (per-tenant)
 
-Preferred path: push digests + jobs into **one user** via ingest (admin: `imrn.dev@gmail.com`).
+Two ways jobs reach a tenant now: (1) the tenant's own **Run fetch** button (`/fetches`), which visits their active companies' real careers portals live — see "Live fetcher" below; (2) push digests + jobs into **one user** via ingest (admin: `imrn.dev@gmail.com`), for morning bulk publish.
 
 ```bash
 curl -X POST https://hunter.imrn.dev/api/ingest/daily \
@@ -94,6 +94,18 @@ curl -X POST https://hunter.imrn.dev/api/ingest/daily \
 - **Strict tenancy:** Daily / Board / Kanban / Fetches read only the tenant’s own Redis keys. There is no fallback to `data/*.json`; a new account sees an empty feed until ingest runs for it. The legacy `data/` files are copied into the **admin** tenant once (`hunter:migrated:jobs:v1`) and are otherwise unused.
 
 Job fields: `id`, `company`, `role`, `level`, `aiFocus`, `location`, `postedOrUpdated`, `match`, `url`, `whyMatch`, `dateSeen`, `isNew`.
+
+## Live fetcher (`lib/live-fetch.ts`)
+
+`POST /api/fetches/run` visits each active company's real careers portal instead of matching a static catalog:
+Greenhouse, Lever, Ashby, SmartRecruiters and Workday get their own public job-board API call (the same data a
+browser loads); everything else falls back to schema.org `JobPosting` structured data on the page. Bot-blocking
+responses are reported honestly, not bypassed — no CAPTCHA solving, no fingerprint spoofing, no proxy rotation.
+Transient failures retry in-request, then once more via `after()` after the response is sent; `FetchesView`
+polls and toasts when a run finishes.
+
+Free-plan tenants get a manual quota instead of the cadence gate: 2 runs/day, or 10/day with `?fetch=more` on
+the run request. Paid plans and admin keep the existing daily cadence gate.
 
 ## Auth
 

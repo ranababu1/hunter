@@ -84,6 +84,11 @@ export function adminBilling(): BillingAccount {
 
 const PAID_COMPANY_PLANS: CompanyPlanId[] = ["cos_20", "cos_45", "cos_100"];
 
+/** True for any paid company tier (cos_20/45/100) — not admin, not free. */
+export function isPaidCompanyPlan(planId: CompanyPlanId): boolean {
+  return PAID_COMPANY_PLANS.includes(planId);
+}
+
 export function resolveEntitlements(
   role: UserRole,
   billing: BillingAccount | null | undefined,

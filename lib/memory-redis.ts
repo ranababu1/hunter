@@ -117,6 +117,35 @@ export class MemoryRedis {
     if (!e || e.kind !== "set") return 0;
     return e.value.size;
   }
+
+  async srem(key: string, ...members: string[]): Promise<number> {
+    const e = this.read(key);
+    if (!e || e.kind !== "set") return 0;
+    let removed = 0;
+    for (const m of members) {
+      if (e.value.delete(m)) removed += 1;
+    }
+    return removed;
+  }
+
+  async del(...keys: string[]): Promise<number> {
+    let removed = 0;
+    for (const k of keys) {
+      if (this.store.delete(k)) removed += 1;
+      this.expires.delete(k);
+    }
+    return removed;
+  }
+
+  async hdel(key: string, ...fields: string[]): Promise<number> {
+    const e = this.read(key);
+    if (!e || e.kind !== "hash") return 0;
+    let removed = 0;
+    for (const f of fields) {
+      if (e.value.delete(f)) removed += 1;
+    }
+    return removed;
+  }
 }
 
 // Next bundles pages and route handlers separately, so a module-level
