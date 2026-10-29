@@ -24,6 +24,8 @@ export function u(userId: string) {
     usage: `hunter:u:${userId}:usage`,
     /** Hash: ApplyItem id → ApplyItem JSON (Apply add-on) */
     apply: `hunter:u:${userId}:apply`,
+    /** Hash: ResumeDoc id → ResumeDoc JSON (Resume Manager add-on) */
+    resumes: `hunter:u:${userId}:resumes`,
     billing: `hunter:u:${userId}:billing`,
     fetchRuns: `hunter:u:${userId}:fetchRuns`,
     lastFetchDate: `hunter:u:${userId}:lastFetchDate`,

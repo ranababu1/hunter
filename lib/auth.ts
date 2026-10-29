@@ -120,6 +120,11 @@ export function hasApplyAddon(u: Pick<User, "email" | "addons">): boolean {
   return isAdminEmail(u.email) || Boolean(u.addons?.apply);
 }
 
+/** Resume Manager add-on access: admin email always; others need addons.resumes. */
+export function hasResumesAddon(u: Pick<User, "email" | "addons">): boolean {
+  return isAdminEmail(u.email) || Boolean(u.addons?.resumes);
+}
+
 export function toPublicUser(u: User): PublicUser {
   return {
     id: u.id,
@@ -132,6 +137,7 @@ export function toPublicUser(u: User): PublicUser {
     isSpecialFriend: u.isSpecialFriend,
     addons: u.addons,
     hasApplyAddon: hasApplyAddon(u),
+    hasResumesAddon: hasResumesAddon(u),
   };
 }
 

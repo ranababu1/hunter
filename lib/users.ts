@@ -546,6 +546,8 @@ export type AdminUserPatch = {
   isSpecialFriend?: boolean;
   /** Apply add-on flag ($50/mo, no payment integration yet). */
   applyAddon?: boolean;
+  /** Resume Manager add-on flag ($30/mo, no payment integration yet). */
+  resumesAddon?: boolean;
 };
 
 /**
@@ -591,6 +593,10 @@ export async function adminUpdateUser(
   }
   if (patch.applyAddon !== undefined) {
     user.addons = { ...(user.addons ?? {}), apply: patch.applyAddon };
+    userChanged = true;
+  }
+  if (patch.resumesAddon !== undefined) {
+    user.addons = { ...(user.addons ?? {}), resumes: patch.resumesAddon };
     userChanged = true;
   }
   if (userChanged) {

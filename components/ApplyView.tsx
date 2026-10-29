@@ -113,6 +113,15 @@ function ItemCard({
         </div>
       ) : null}
 
+      {item.resumeId ? (
+        <Link
+          href={`/resumes?id=${encodeURIComponent(item.resumeId)}`}
+          className="inline-flex w-fit items-center gap-1.5 rounded-full border border-[rgba(45,212,191,0.45)] bg-[var(--accent-soft)] px-3 py-1.5 text-xs font-medium text-[var(--accent)] transition hover:brightness-110"
+        >
+          Review tailored resume →
+        </Link>
+      ) : null}
+
       {item.resume || item.tailoringNotes ? (
         <div>
           <div className="eyebrow mb-1">Resume</div>

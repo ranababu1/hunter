@@ -80,6 +80,13 @@ export async function PATCH(
     patch.applyAddon = body.applyAddon;
   }
 
+  if (body.resumesAddon !== undefined) {
+    if (typeof body.resumesAddon !== "boolean") {
+      return NextResponse.json({ error: "resumesAddon must be boolean" }, { status: 400 });
+    }
+    patch.resumesAddon = body.resumesAddon;
+  }
+
   const result = await adminUpdateUser(id, patch, isAdminEmail);
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 400 });
