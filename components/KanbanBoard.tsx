@@ -31,6 +31,12 @@ import {
 } from "@/lib/types";
 import { JobCard } from "./JobCard";
 import { JobDrawer } from "./JobDrawer";
+import {
+  KanbanFilterBar,
+  applyKanbanFilters,
+  filtersActive,
+  usePersistentKanbanFilters,
+} from "./KanbanFilters";
 
 type BoardColumnId = (typeof KANBAN_BOARD_COLUMNS)[number]["id"];
 
@@ -75,6 +81,7 @@ function Column({
   id,
   label,
   jobs,
+  total,
   visitedSet,
   statusMap,
   onOpen,
@@ -82,6 +89,7 @@ function Column({
   id: BoardColumnId;
   label: string;
   jobs: Job[];
+  total?: number;
   visitedSet: Set<string>;
   statusMap: Record<string, KanbanStatus>;
   onOpen: (job: Job) => void;
@@ -105,7 +113,9 @@ function Column({
           {label}
         </span>
         <span className="rounded-full bg-[rgba(255,255,255,0.06)] px-2 py-0.5 text-[10px] tabular-nums text-[var(--text-dim)]">
-          {jobs.length}
+          {total !== undefined && total !== jobs.length
+            ? `${jobs.length} / ${total}`
+            : jobs.length}
         </span>
       </div>
       <div
@@ -243,6 +253,23 @@ export function KanbanBoard({
     [state.status],
   );
 
+  const [filters, setFilters] = usePersistentKanbanFilters();
+  const filteredJobs = useMemo(
+    () => applyKanbanFilters(jobs, filters, getStatus, visitedSet),
+    [jobs, filters, getStatus, visitedSet],
+  );
+  const isFiltering = filtersActive(filters);
+
+  const totals = useMemo(() => {
+    const t: Record<string, number> = {};
+    for (const job of jobs) {
+      const s = getStatus(job.id);
+      const k = isEndStatus(s) ? "end" : s;
+      t[k] = (t[k] ?? 0) + 1;
+    }
+    return t;
+  }, [jobs, getStatus]);
+
   const columns = useMemo(() => {
     const buckets: Record<string, Job[]> = {
       identified: [],
@@ -251,7 +278,7 @@ export function KanbanBoard({
       interviewing: [],
       end: [],
     };
-    for (const job of jobs) {
+    for (const job of filteredJobs) {
       const s = getStatus(job.id);
       if (isEndStatus(s)) {
         buckets.end.push(job);
@@ -260,7 +287,7 @@ export function KanbanBoard({
       }
     }
     return buckets;
-  }, [jobs, getStatus]);
+  }, [filteredJobs, getStatus]);
 
   const patch = useCallback(
     async (jobId: string, body: { visited?: boolean; status?: KanbanStatus }) => {
@@ -417,6 +444,14 @@ export function KanbanBoard({
         </p>
       </div>
 
+      <KanbanFilterBar
+        jobs={jobs}
+        filters={filters}
+        setFilters={setFilters}
+        shown={filteredJobs.length}
+        getStatus={getStatus}
+      />
+
       <DndContext
         sensors={sensors}
         collisionDetection={collisionDetection}
@@ -430,6 +465,7 @@ export function KanbanBoard({
               id={col.id}
               label={col.label}
               jobs={columns[col.id] ?? []}
+              total={isFiltering ? (totals[col.id] ?? 0) : undefined}
               visitedSet={visitedSet}
               statusMap={state.status}
               onOpen={setSelected}
