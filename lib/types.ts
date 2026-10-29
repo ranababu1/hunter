@@ -210,6 +210,8 @@ export interface User {
    * account itself (its own /api/me) and to the admin managing it.
    */
   isSpecialFriend?: boolean;
+  /** Paid add-ons, independent of plans (e.g. Apply, $50/mo). Admin-toggled for now. */
+  addons?: UserAddons;
 }
 
 /** Public user shape (no password hash). */
@@ -222,6 +224,10 @@ export interface PublicUser {
   createdAt: string;
   onboardingCompletedAt?: string;
   isSpecialFriend?: boolean;
+  /** Paid add-ons, independent of plans (e.g. Apply, $50/mo). Admin-toggled for now. */
+  addons?: UserAddons;
+  /** Computed: admin or addons.apply. */
+  hasApplyAddon?: boolean;
 }
 
 export type FetchCadence = "daily" | "alternate";
@@ -306,4 +312,60 @@ export interface QuotaErrorBody {
   limit: number;
   used: number;
   message?: string;
+}
+
+// ── Apply add-on ──────────────────────────────────────────────
+
+export interface UserAddons {
+  /** Apply add-on ($50/month, separate from plans). */
+  apply?: boolean;
+}
+
+export type ApplyStatus =
+  | "pending"
+  | "approved"
+  | "applying"
+  | "applied"
+  | "skipped"
+  | "already_in_touch"
+  | "needs_you";
+
+export const APPLY_STATUSES: { id: ApplyStatus; label: string }[] = [
+  { id: "pending", label: "Pending" },
+  { id: "approved", label: "Approved" },
+  { id: "applying", label: "Applying" },
+  { id: "applied", label: "Applied" },
+  { id: "skipped", label: "Skipped" },
+  { id: "already_in_touch", label: "Already in touch" },
+  { id: "needs_you", label: "Needs you" },
+];
+
+export type ApplyDecision = "yes" | "no" | null;
+
+/** One recommended role on the Apply tab (stored per user in Redis). */
+export interface ApplyItem {
+  /** Stable id — usually the Job id. */
+  id: string;
+  jobId?: string;
+  company: string;
+  role: string;
+  location?: string;
+  url: string;
+  match: MatchLevel;
+  /** Lower = higher priority. */
+  priority?: number;
+  whyRecommended: string;
+  gaps: string[];
+  /** Which resume to use (name/label). */
+  resume?: string;
+  tailoringNotes?: string;
+  status: ApplyStatus;
+  /** The user's Yes/No; null until decided. */
+  decision: ApplyDecision;
+  /** Free-form notes from the assistant (e.g. what it needs from the user). */
+  assistantNotes?: string;
+  createdAt: string;
+  updatedAt: string;
+  decidedAt?: string;
+  appliedAt?: string;
 }

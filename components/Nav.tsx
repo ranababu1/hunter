@@ -14,6 +14,7 @@ import {
   User,
   CreditCard,
   Users,
+  Send,
 } from "lucide-react";
 import { useMe } from "@/components/MeProvider";
 
@@ -21,6 +22,7 @@ const baseLinks = [
   { href: "/daily", label: "Daily", icon: Newspaper },
   { href: "/board", label: "Board", icon: LayoutGrid },
   { href: "/kanban", label: "Kanban", icon: Columns3 },
+  { href: "/apply", label: "Apply", icon: Send },
   { href: "/fetches", label: "Fetches", icon: Radio },
   { href: "/companies", label: "Companies", icon: Building2 },
 ];
