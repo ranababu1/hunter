@@ -11,6 +11,7 @@ type AdminUserRow = {
   phone: string;
   role: string;
   isSpecialFriend: boolean;
+  applyAddon: boolean;
   companyPlan: string;
   storagePlan: string;
   planLabel: string;
@@ -52,6 +53,7 @@ type EditForm = {
   companyPlan: string;
   storagePlan: string;
   isSpecialFriend: boolean;
+  applyAddon: boolean;
 };
 
 function EditUserModal({
@@ -70,6 +72,7 @@ function EditUserModal({
     companyPlan: row.companyPlan === "unlimited" ? "free" : row.companyPlan,
     storagePlan: row.storagePlan === "unlimited" ? "free" : row.storagePlan,
     isSpecialFriend: row.isSpecialFriend,
+    applyAddon: row.applyAddon,
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -206,6 +209,25 @@ function EditUserModal({
                 fetches/day — regardless of billing plan. Never shown
                 publicly; the account sees it as &ldquo;Extra benefits for
                 friends&rdquo; on their own profile.
+              </span>
+            </span>
+          </label>
+
+          <label className="flex items-start gap-2.5 rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 py-2.5">
+            <input
+              type="checkbox"
+              checked={form.applyAddon}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, applyAddon: e.target.checked }))
+              }
+              className="mt-0.5 h-4 w-4 accent-[var(--accent)]"
+            />
+            <span className="text-sm">
+              <span className="font-medium text-[var(--text)]">Apply add-on</span>
+              <span className="mt-0.5 block text-xs text-[var(--text-dim)]">
+                $50/month add-on, separate from plans. Unlocks the Apply tab
+                (recommended roles + assisted applying). No payment
+                integration yet — toggle manually.
               </span>
             </span>
           </label>
@@ -418,6 +440,14 @@ export function UsersView() {
                       {row.role === "admin" && (
                         <span className="ml-2 rounded-full bg-[var(--accent-soft)] px-1.5 py-0.5 text-[0.65rem] font-semibold uppercase text-[var(--accent)]">
                           admin
+                        </span>
+                      )}
+                      {row.applyAddon && (
+                        <span
+                          className="ml-2 rounded-full border border-[rgba(45,212,191,0.35)] px-1.5 py-0.5 text-[0.65rem] font-semibold uppercase text-[var(--accent)]"
+                          title="Apply add-on"
+                        >
+                          apply
                         </span>
                       )}
                       {row.isSpecialFriend && (

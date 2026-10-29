@@ -115,6 +115,11 @@ export async function verifySessionToken(
   return verifyToken(userId, token, getAuthSecret());
 }
 
+/** Apply add-on access: the owner/admin email always; others need addons.apply. */
+export function hasApplyAddon(u: Pick<User, "email" | "addons">): boolean {
+  return isAdminEmail(u.email) || Boolean(u.addons?.apply);
+}
+
 export function toPublicUser(u: User): PublicUser {
   return {
     id: u.id,
@@ -125,6 +130,8 @@ export function toPublicUser(u: User): PublicUser {
     createdAt: u.createdAt,
     onboardingCompletedAt: u.onboardingCompletedAt,
     isSpecialFriend: u.isSpecialFriend,
+    addons: u.addons,
+    hasApplyAddon: hasApplyAddon(u),
   };
 }
 

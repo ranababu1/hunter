@@ -544,6 +544,8 @@ export type AdminUserPatch = {
   storagePlan?: BillingAccount["storagePlan"];
   /** Admin-granted perk — 100 companies, daily cadence, 10 manual fetches/day. Never public. */
   isSpecialFriend?: boolean;
+  /** Apply add-on flag ($50/mo, no payment integration yet). */
+  applyAddon?: boolean;
 };
 
 /**
@@ -585,6 +587,10 @@ export async function adminUpdateUser(
   }
   if (patch.isSpecialFriend !== undefined) {
     user.isSpecialFriend = patch.isSpecialFriend;
+    userChanged = true;
+  }
+  if (patch.applyAddon !== undefined) {
+    user.addons = { ...(user.addons ?? {}), apply: patch.applyAddon };
     userChanged = true;
   }
   if (userChanged) {

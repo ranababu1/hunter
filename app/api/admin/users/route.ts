@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireUser } from "@/lib/auth";
+import { hasApplyAddon, requireUser } from "@/lib/auth";
 import {
   getBilling,
   getFetchRuns,
@@ -48,6 +48,7 @@ export async function GET() {
         phone: u.phone ?? "",
         role: u.role,
         isSpecialFriend: u.isSpecialFriend ?? false,
+        applyAddon: hasApplyAddon(u),
         companyPlan,
         storagePlan,
         planLabel: `${companyPlanLabel(companyPlan)} · ${storagePlanLabel(storagePlan)}`,

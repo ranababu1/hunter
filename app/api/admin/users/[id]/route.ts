@@ -73,6 +73,13 @@ export async function PATCH(
     patch.isSpecialFriend = body.isSpecialFriend;
   }
 
+  if (body.applyAddon !== undefined) {
+    if (typeof body.applyAddon !== "boolean") {
+      return NextResponse.json({ error: "applyAddon must be boolean" }, { status: 400 });
+    }
+    patch.applyAddon = body.applyAddon;
+  }
+
   const result = await adminUpdateUser(id, patch, isAdminEmail);
   if (!result.ok) {
     return NextResponse.json({ error: result.error }, { status: 400 });
