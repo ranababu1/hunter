@@ -12,6 +12,7 @@ type AdminUserRow = {
   role: string;
   isSpecialFriend: boolean;
   applyAddon: boolean;
+  resumesAddon: boolean;
   companyPlan: string;
   storagePlan: string;
   planLabel: string;
@@ -54,6 +55,7 @@ type EditForm = {
   storagePlan: string;
   isSpecialFriend: boolean;
   applyAddon: boolean;
+  resumesAddon: boolean;
 };
 
 function EditUserModal({
@@ -73,6 +75,7 @@ function EditUserModal({
     storagePlan: row.storagePlan === "unlimited" ? "free" : row.storagePlan,
     isSpecialFriend: row.isSpecialFriend,
     applyAddon: row.applyAddon,
+    resumesAddon: row.resumesAddon,
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -228,6 +231,24 @@ function EditUserModal({
                 $50/month add-on, separate from plans. Unlocks the Apply tab
                 (recommended roles + assisted applying). No payment
                 integration yet — toggle manually.
+              </span>
+            </span>
+          </label>
+
+          <label className="flex items-start gap-2.5 rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 py-2.5">
+            <input
+              type="checkbox"
+              checked={form.resumesAddon}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, resumesAddon: e.target.checked }))
+              }
+              className="mt-0.5 h-4 w-4 accent-[var(--accent)]"
+            />
+            <span className="text-sm">
+              <span className="font-medium text-[var(--text)]">Resume Manager add-on ($30/mo)</span>
+              <span className="mt-0.5 block text-xs text-[var(--text-dim)]">
+                Unlocks the Resumes tab (versions, editor, tailored drafts,
+                export). No payment integration yet — toggle manually.
               </span>
             </span>
           </label>
@@ -440,6 +461,14 @@ export function UsersView() {
                       {row.role === "admin" && (
                         <span className="ml-2 rounded-full bg-[var(--accent-soft)] px-1.5 py-0.5 text-[0.65rem] font-semibold uppercase text-[var(--accent)]">
                           admin
+                        </span>
+                      )}
+                      {row.resumesAddon && (
+                        <span
+                          className="ml-2 rounded-full border border-[rgba(45,212,191,0.35)] px-1.5 py-0.5 text-[0.65rem] font-semibold uppercase text-[var(--accent)]"
+                          title="Resume Manager add-on"
+                        >
+                          resumes
                         </span>
                       )}
                       {row.applyAddon && (

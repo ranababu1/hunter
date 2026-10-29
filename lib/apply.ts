@@ -169,6 +169,7 @@ export async function upsertApplyItems(
       resume: str(r.resume, 300) ?? prev?.resume,
       tailoringNotes: str(r.tailoringNotes) ?? prev?.tailoringNotes,
       assistantNotes: str(r.assistantNotes) ?? prev?.assistantNotes,
+      resumeId: str(r.resumeId, 200) ?? prev?.resumeId,
       status,
       decision: prev?.decision ?? null,
       decidedAt: prev?.decidedAt,
@@ -215,6 +216,7 @@ export async function updateApplyItems(
     if (typeof r.assistantNotes === "string") item.assistantNotes = r.assistantNotes.slice(0, 4000);
     if (typeof r.tailoringNotes === "string") item.tailoringNotes = r.tailoringNotes.slice(0, 4000);
     if (typeof r.resume === "string") item.resume = r.resume.slice(0, 300);
+    if (typeof r.resumeId === "string") item.resumeId = r.resumeId.slice(0, 200) || undefined;
     item.updatedAt = now;
     updated.push(item);
   }

@@ -228,6 +228,8 @@ export interface PublicUser {
   addons?: UserAddons;
   /** Computed: admin or addons.apply. */
   hasApplyAddon?: boolean;
+  /** Computed: admin or addons.resumes. */
+  hasResumesAddon?: boolean;
 }
 
 export type FetchCadence = "daily" | "alternate";
@@ -319,6 +321,8 @@ export interface QuotaErrorBody {
 export interface UserAddons {
   /** Apply add-on ($50/month, separate from plans). */
   apply?: boolean;
+  /** Resume Manager add-on ($30/month, separate from plans). */
+  resumes?: boolean;
 }
 
 export type ApplyStatus =
@@ -364,8 +368,69 @@ export interface ApplyItem {
   decision: ApplyDecision;
   /** Free-form notes from the assistant (e.g. what it needs from the user). */
   assistantNotes?: string;
+  /** Linked tailored resume version (Resume Manager). */
+  resumeId?: string;
   createdAt: string;
   updatedAt: string;
   decidedAt?: string;
   appliedAt?: string;
+}
+
+// ── Resume Manager add-on ─────────────────────────────────────
+
+export type ResumeKindTag = "base" | "tailored";
+export type ResumeStatus = "ready" | "draft_requested" | "draft_ready";
+
+export interface ResumeExperience {
+  id: string;
+  company: string;
+  title: string;
+  location?: string;
+  start: string;
+  end: string;
+  bullets: string[];
+}
+
+export interface ResumeSkillGroup {
+  group: string;
+  items: string[];
+}
+
+export interface ResumeContact {
+  name: string;
+  headline?: string;
+  email?: string;
+  phone?: string;
+  linkedin?: string;
+  website?: string;
+  location?: string;
+}
+
+export interface ResumeDoc {
+  id: string;
+  name: string;
+  /** Target role / track, e.g. "AI Architect". */
+  track: string;
+  tags: string[];
+  kind: ResumeKindTag;
+  status: ResumeStatus;
+  /** For tailored versions: the base it came from. */
+  baseId?: string;
+  jobId?: string;
+  applyItemId?: string;
+  /** Job description pasted when generating a tailored draft. */
+  jdText?: string;
+  contact: ResumeContact;
+  summary: string;
+  experience: ResumeExperience[];
+  skills: ResumeSkillGroup[];
+  certifications: string[];
+  education: string[];
+  /** Extracted text from an uploaded file (before/alongside structuring). */
+  rawText?: string;
+  sourceFileName?: string;
+  /** What changed vs base (tailoring log) or other notes. */
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
 }
